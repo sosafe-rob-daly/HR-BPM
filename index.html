@@ -7,6 +7,30 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>HR-BPM</title>
+    <link rel="icon" type="image/png" href="/HR-BPM/favicon.png" />
+    <script>
+      (function() {
+        function setFavicon(dark) {
+          var img = new Image();
+          img.onload = function() {
+            var c = document.createElement('canvas');
+            c.width = img.width;
+            c.height = img.height;
+            var ctx = c.getContext('2d');
+            if (dark) {
+              ctx.filter = 'invert(1)';
+            }
+            ctx.drawImage(img, 0, 0);
+            var link = document.querySelector("link[rel='icon']");
+            if (link) link.href = c.toDataURL('image/png');
+          };
+          img.src = (document.querySelector("base") ? document.querySelector("base").href : '/HR-BPM/') + 'favicon.png';
+        }
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        setFavicon(mq.matches);
+        mq.addEventListener('change', function(e) { setFavicon(e.matches); });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
