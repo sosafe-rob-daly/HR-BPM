@@ -206,60 +206,69 @@ export default function App() {
         </div>
 
         {hasMessages ? (
-          <div className="message-thread" ref={threadRef}>
-            {activeChat.messages.map((msg) => (
-              <div key={msg.id} className={`message message--${msg.role}`}>
-                <div className="message-bubble">{msg.content}</div>
+          <div className="chat-card">
+            <div className="message-thread" ref={threadRef}>
+              {activeChat.messages.map((msg) => (
+                <div key={msg.id} className={`message message--${msg.role}`}>
+                  <div className="message-bubble">{msg.content}</div>
 
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="message-sources">
-                    {msg.sources.map((s, i) => (
-                      <span key={i} className="source-tag">
-                        {s.title}
-                        {s.lastUpdated && ` · updated ${s.lastUpdated}`}
-                      </span>
-                    ))}
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="message-sources">
+                      {msg.sources.map((s, i) => (
+                        <span key={i} className="source-tag">
+                          {s.title}
+                          {s.lastUpdated && ` · updated ${s.lastUpdated}`}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {msg.flags && msg.flags.length > 0 && (
+                    <div className="message-flags">
+                      {msg.flags.map((f, i) => (
+                        <span key={i} className={`flag flag--${f.type}`}>
+                          {f.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="message-meta">
+                    {msg.timestamp.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </div>
-                )}
+                </div>
+              ))}
 
-                {msg.flags && msg.flags.length > 0 && (
-                  <div className="message-flags">
-                    {msg.flags.map((f, i) => (
-                      <span key={i} className={`flag flag--${f.type}`}>
-                        {f.label}
-                      </span>
-                    ))}
+              {responding && (
+                <div className="message message--agent">
+                  <div className="message-bubble typing-indicator">
+                    <span /><span /><span />
                   </div>
-                )}
-
-                <div className="message-meta">
-                  {msg.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
 
-            {responding && (
-              <div className="message message--agent">
-                <div className="message-bubble typing-indicator">
-                  <span /><span /><span />
-                </div>
+            {error && (
+              <div className="chat-error">
+                {error}
               </div>
             )}
+
+            <ChatInput onSend={handleSend} disabled={responding} />
           </div>
         ) : (
-          <Welcome onSend={handleSend} disabled={responding} themeId={themeId} />
+          <>
+            <Welcome onSend={handleSend} disabled={responding} themeId={themeId} />
+            {error && (
+              <div className="chat-error">
+                {error}
+              </div>
+            )}
+          </>
         )}
-
-        {error && (
-          <div className="chat-error">
-            {error}
-          </div>
-        )}
-
-        {hasMessages && <ChatInput onSend={handleSend} disabled={responding} />}
       </div>
 
       <Settings
