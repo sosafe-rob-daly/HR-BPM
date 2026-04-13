@@ -445,41 +445,22 @@ body {
   padding: 40px 28px;
   position: relative;
   overflow: hidden;
+  background:
+    url('./assets/tilable-bg.png') repeat center center;
+  background-size: 400px;
 }
 
-/* Gradient orbs */
-.welcome::before,
-.welcome::after {
+/* Soft overlay to blend the tiled image */
+.welcome::before {
   content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.5;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, rgba(250, 249, 251, 0.55) 0%, rgba(250, 249, 251, 0.3) 100%);
   pointer-events: none;
-  animation: orbFloat 12s ease-in-out infinite;
 }
 
-.welcome::before {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(108, 92, 231, 0.25) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%);
-  top: -15%;
-  right: -10%;
-}
-
-.welcome::after {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, rgba(6, 182, 212, 0.06) 40%, transparent 70%);
-  bottom: -10%;
-  left: -10%;
-  animation-delay: -6s;
-}
-
-@keyframes orbFloat {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(15px, -20px) scale(1.05); }
-  66% { transform: translate(-10px, 10px) scale(0.97); }
+[data-theme="dark"] .welcome::before {
+  background: radial-gradient(ellipse at 50% 50%, rgba(14, 13, 19, 0.7) 0%, rgba(14, 13, 19, 0.5) 100%);
 }
 
 .welcome-content {
@@ -491,6 +472,15 @@ body {
   z-index: 1;
   width: 100%;
   max-width: 580px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: var(--radius-xl);
+  padding: 48px 40px;
+}
+
+[data-theme="dark"] .welcome-content {
+  background: rgba(22, 20, 30, 0.65);
 }
 
 .welcome-greeting {
@@ -542,10 +532,12 @@ body {
 }
 
 .welcome-input .chat-input-wrapper {
-  box-shadow: var(--shadow-lg);
-  border-color: var(--border-2);
-  border-width: 2px;
-  background: var(--bg-0);
+  box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .welcome-input .chat-input-wrapper {
+  background: rgba(30, 27, 46, 0.6);
 }
 
 /* ---- Input area ---- */
