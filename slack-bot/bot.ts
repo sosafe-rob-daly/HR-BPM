@@ -229,9 +229,10 @@ app.use(async ({ body, next }) => {
 
 // Handle DMs
 app.message(async ({ message, say, client }) => {
-  console.log('[message]', JSON.stringify(message, null, 2));
-  // Only handle actual user messages (not bot messages, edits, etc.)
-  if (!('text' in message) || !message.text || ('bot_id' in message)) return;
+  // Only handle actual user messages (not bot messages, edits, subtypes)
+  if ('subtype' in message) return;
+  if (!('text' in message) || !message.text) return;
+  if ('bot_id' in message) return;
   console.log('[processing]', message.text);
 
   const channel = message.channel;
