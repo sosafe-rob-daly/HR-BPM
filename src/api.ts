@@ -200,7 +200,9 @@ async function getLastAssistantMessage(threadId: string): Promise<string> {
   if (!msg || msg.role !== 'assistant') throw new Error('No assistant response');
 
   const textBlock = msg.content.find((c) => c.type === 'text');
-  return textBlock?.text?.value ?? '';
+  const raw = textBlock?.text?.value ?? '';
+  // Strip OpenAI file search citation markers like 【4:0†source】
+  return raw.replace(/【\d+:\d+†[^】]*】/g, '');
 }
 
 // ── Thread management (per chat) ────────────────────────────────────
