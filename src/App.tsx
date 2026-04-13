@@ -1,15 +1,21 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Message } from './types/chat';
-import { generateMockResponse } from './mock';
+import { sendMessage, buildHistory, getApiKey } from './api';
 import Sidebar from './components/Sidebar';
 import ChatInput from './components/ChatInput';
 import Welcome from './components/Welcome';
+import Settings from './components/Settings';
 
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [topic, setTopic] = useState<string | null>(null);
+  const [route, setRoute] = useState<string | null>(null);
   const [responding, setResponding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+
+  const hasKey = !!getApiKey();
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -22,7 +28,13 @@ export default function App() {
   useEffect(scrollToBottom, [messages, scrollToBottom]);
 
   const handleSend = useCallback(
-    (text: string) => {
+    async (text: string) => {
+      if (!getApiKey()) {
+        setSettingsOpen(true);
+        return;
+      }
+
+      setError(null);
       const userMsg: Message = {
         id: `user-${Date.now()}`,
         role: 'user',
@@ -33,15 +45,31 @@ export default function App() {
       setMessages((prev) => [...prev, userMsg]);
       setResponding(true);
 
-      // Simulate agent thinking delay
-      setTimeout(() => {
-        const { message, topic: newTopic } = generateMockResponse(text);
-        setMessages((prev) => [...prev, message]);
-        setTopic(newTopic);
+      try {
+        const history = buildHistory(messages);
+        const result = await sendMessage(text, history);
+
+        const agentMsg: Message = {
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          content: result.content,
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, agentMsg]);
+        setTopic(result.topic);
+        setRoute(result.route);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Something went wrong';
+        setError(msg);
+        if (msg.includes('API key') || msg.includes('401')) {
+          setSettingsOpen(true);
+        }
+      } finally {
         setResponding(false);
-      }, 800 + Math.random() * 600);
+      }
     },
-    [],
+    [messages],
   );
 
   const hasMessages = messages.length > 0;
@@ -53,6 +81,20 @@ export default function App() {
         <div className="chat-header">
           <div className="chat-header-dot" />
           <div className="chat-header-title">HR Business Partner Agent</div>
+          {route && <span className="route-badge">{route}</span>}
+          <div style={{ flex: 1 }} />
+          {!hasKey && (
+            <button className="setup-hint" onClick={() => setSettingsOpen(true)}>
+              Set up API key to start
+            </button>
+          )}
+          <button
+            className="settings-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+          >
+            &#9881;
+          </button>
         </div>
 
         {hasMessages ? (
@@ -90,13 +132,29 @@ export default function App() {
                 </div>
               </div>
             ))}
+
+            {responding && (
+              <div className="message message--agent">
+                <div className="message-bubble typing-indicator">
+                  <span /><span /><span />
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <Welcome onPrompt={handleSend} />
         )}
 
+        {error && (
+          <div className="chat-error">
+            {error}
+          </div>
+        )}
+
         <ChatInput onSend={handleSend} disabled={responding} />
       </div>
+
+      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
