@@ -645,16 +645,20 @@ body {
 }
 
 .welcome-greeting {
-  font-size: 32px;
-  font-weight: 600;
-  color: #1a4d3e;
-  letter-spacing: -0.02em;
   opacity: 0;
   transition: opacity 0.6s ease;
+  display: flex;
+  justify-content: center;
 }
 
-[data-theme="dark"] .welcome-greeting {
-  color: #4ade80;
+.welcome-logo {
+  height: 80px;
+  width: auto;
+  opacity: 0.85;
+}
+
+[data-theme="dark"] .welcome-logo {
+  filter: invert(1);
 }
 
 .welcome-greeting--visible {

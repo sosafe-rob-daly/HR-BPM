@@ -21,9 +21,9 @@ export default function Welcome({ onSend, disabled }: WelcomeProps) {
   return (
     <div className="welcome">
       <div className="welcome-content">
-        <p className={`welcome-greeting ${stage >= 1 ? 'welcome-greeting--visible' : ''}`}>
-          Welcome to SoSafe HRBP
-        </p>
+        <div className={`welcome-greeting ${stage >= 1 ? 'welcome-greeting--visible' : ''}`}>
+          <img src={import.meta.env.BASE_URL + 'sosafe-logo.png'} alt="SoSafe HRBP" className="welcome-logo" />
+        </div>
         <div className={`welcome-main ${stage >= 2 ? 'welcome-main--visible' : ''}`}>
           <h2>What can I help with?</h2>
           <div className="welcome-input">
