@@ -4,6 +4,7 @@ import type { SavedChat } from './types/chat';
 import { sendMessage, buildHistory, getApiKey, validateConnection } from './api';
 import type { ConnectionStatus } from './api';
 import { getChats, getChat, saveChat, deleteChat, createChat, titleFromMessages } from './store';
+import { getTheme, getThemeId } from './themes';
 import Sidebar from './components/Sidebar';
 import ChatInput from './components/ChatInput';
 import Welcome from './components/Welcome';
@@ -35,6 +36,7 @@ export default function App() {
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [themeId, setThemeId] = useState(getThemeId);
   const [connection, setConnection] = useState<ConnectionStatus>({
     connected: false,
     model: null,
@@ -160,8 +162,13 @@ export default function App() {
     [activeChat, refreshChats],
   );
 
+  const theme = getTheme(themeId);
+
   return (
-    <div className={`app ${showSidebar ? '' : 'app--no-sidebar'}`}>
+    <div
+      className={`app ${showSidebar ? '' : 'app--no-sidebar'}`}
+      style={{ backgroundImage: `url(${theme.image})` }}
+    >
       {showSidebar && (
         <Sidebar
           chats={chats}
@@ -240,7 +247,7 @@ export default function App() {
             )}
           </div>
         ) : (
-          <Welcome onSend={handleSend} disabled={responding} />
+          <Welcome onSend={handleSend} disabled={responding} themeId={themeId} />
         )}
 
         {error && (
@@ -256,6 +263,7 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onStatusChange={setConnection}
+        onThemeChange={setThemeId}
       />
     </div>
   );

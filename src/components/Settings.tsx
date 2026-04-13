@@ -1,24 +1,28 @@
 import { useState, useEffect } from 'react';
 import { getApiKey, setApiKey, clearApiKey, validateConnection } from '../api';
 import type { ConnectionStatus } from '../api';
+import { themes, getThemeId, setThemeId } from '../themes';
 
 interface SettingsProps {
   open: boolean;
   onClose: () => void;
   onStatusChange: (status: ConnectionStatus) => void;
+  onThemeChange: (themeId: string) => void;
 }
 
-export default function Settings({ open, onClose, onStatusChange }: SettingsProps) {
+export default function Settings({ open, onClose, onStatusChange, onThemeChange }: SettingsProps) {
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [validating, setValidating] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
+  const [activeTheme, setActiveTheme] = useState(getThemeId);
 
   useEffect(() => {
     if (open) {
       const existing = getApiKey();
       setKey(existing ?? '');
       setSaved(!!existing);
+      setActiveTheme(getThemeId());
     }
   }, [open]);
 
@@ -47,6 +51,12 @@ export default function Settings({ open, onClose, onStatusChange }: SettingsProp
     onStatusChange({ connected: false, model: null, error: null });
   };
 
+  const handleThemeSelect = (id: string) => {
+    setThemeId(id);
+    setActiveTheme(id);
+    onThemeChange(id);
+  };
+
   return (
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
@@ -56,6 +66,28 @@ export default function Settings({ open, onClose, onStatusChange }: SettingsProp
             &times;
           </button>
         </div>
+
+        <div className="settings-section">
+          <label className="settings-label">Theme</label>
+          <div className="theme-grid">
+            {themes.map((t) => (
+              <button
+                key={t.id}
+                className={`theme-swatch ${t.id === activeTheme ? 'theme-swatch--active' : ''}`}
+                onClick={() => handleThemeSelect(t.id)}
+                title={t.name}
+              >
+                <div
+                  className="theme-swatch-preview"
+                  style={{ backgroundImage: `url(${t.preview})` }}
+                />
+                <span className="theme-swatch-name">{t.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-divider" />
 
         <div className="settings-section">
           <label className="settings-label">OpenAI API Key</label>
