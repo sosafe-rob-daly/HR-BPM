@@ -106,9 +106,6 @@ body {
   display: grid;
   grid-template-columns: 280px 1fr;
   height: 100vh;
-  background:
-    url('./assets/tilable-bg.png') repeat center center;
-  background-size: 400px;
 }
 
 .app--no-sidebar {
@@ -118,20 +115,13 @@ body {
 /* ---- Sidebar ---- */
 
 .sidebar {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-right: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 20px 14px;
   gap: 16px;
   overflow-y: auto;
-}
-
-[data-theme="dark"] .sidebar {
-  background: rgba(22, 20, 30, 0.6);
-  border-right-color: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-brand {
@@ -271,13 +261,11 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: rgba(250, 249, 251, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-[data-theme="dark"] .chat-panel {
-  background: rgba(14, 13, 19, 0.8);
+  background:
+    radial-gradient(ellipse at 80% 5%, rgba(108, 92, 231, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 95%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.03) 0%, transparent 60%),
+    var(--bg-0);
 }
 
 .chat-header {
@@ -457,7 +445,22 @@ body {
   padding: 40px 28px;
   position: relative;
   overflow: hidden;
-  background: transparent;
+  background:
+    url('./assets/tilable-bg.png') repeat center center;
+  background-size: 400px;
+}
+
+/* Light vignette to focus attention on the center card */
+.welcome::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(250, 249, 251, 0.35) 100%);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .welcome::before {
+  background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(14, 13, 19, 0.5) 100%);
 }
 
 .welcome-content {
