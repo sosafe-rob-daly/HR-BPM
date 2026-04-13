@@ -3,15 +3,35 @@ import type { Message } from './types/chat';
 import type { SavedChat } from './types/chat';
 import { sendMessage, buildHistory, getApiKey, validateConnection } from './api';
 import type { ConnectionStatus } from './api';
-import { getChats, saveChat, deleteChat, createChat, titleFromMessages } from './store';
+import { getChats, getChat, saveChat, deleteChat, createChat, titleFromMessages } from './store';
 import Sidebar from './components/Sidebar';
 import ChatInput from './components/ChatInput';
 import Welcome from './components/Welcome';
 import Settings from './components/Settings';
 
+// ── Hash routing helpers ────────────────────────────────────────────
+
+function getChatIdFromHash(): string | null {
+  const hash = window.location.hash;
+  const match = hash.match(/^#\/chat\/(.+)$/);
+  return match ? match[1] : null;
+}
+
+function setHash(chatId: string | null) {
+  const newHash = chatId ? `#/chat/${chatId}` : '';
+  if (window.location.hash !== newHash) {
+    window.history.pushState(null, '', newHash || window.location.pathname);
+  }
+}
+
+// ── App ─────────────────────────────────────────────────────────────
+
 export default function App() {
   const [chats, setChats] = useState<SavedChat[]>(getChats);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [activeChatId, setActiveChatId] = useState<string | null>(() => {
+    const id = getChatIdFromHash();
+    return id && getChat(id) ? id : null;
+  });
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -25,6 +45,22 @@ export default function App() {
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
   const hasMessages = activeChat && activeChat.messages.length > 0;
   const showSidebar = chats.length > 0 || hasMessages;
+
+  // Sync hash → state on back/forward navigation
+  useEffect(() => {
+    const onHashChange = () => {
+      const id = getChatIdFromHash();
+      setActiveChatId(id && getChat(id) ? id : null);
+      setError(null);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // Sync state → hash
+  useEffect(() => {
+    setHash(activeChatId);
+  }, [activeChatId]);
 
   useEffect(() => {
     if (getApiKey()) {
