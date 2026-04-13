@@ -132,8 +132,8 @@ export default function App() {
       setResponding(true);
 
       try {
-        const history = buildHistory(chat.messages);
-        const result = await sendMessage(text, history);
+        const history = buildHistory(chat.messages.slice(0, -1)); // exclude the message we just added
+        const result = await sendMessage(text, history, chat.id);
 
         const agentMsg: Message = {
           id: `agent-${Date.now()}`,
