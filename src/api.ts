@@ -54,6 +54,7 @@ export async function validateConnection(): Promise<ConnectionStatus> {
 
   try {
     const res = await fetch(`${OPENAI_BASE}/models/${MODEL}`, {
+      cache: 'no-store',
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 
@@ -96,6 +97,7 @@ function headers(extra?: Record<string, string>): Record<string, string> {
 async function openAiJson(path: string, options: RequestInit = {}): Promise<unknown> {
   const res = await fetch(`${OPENAI_BASE}${path}`, {
     ...options,
+    cache: 'no-store',
     headers: { ...headers(), ...(options.headers as Record<string, string> ?? {}) },
   });
   if (!res.ok) {
