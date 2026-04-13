@@ -43,6 +43,6 @@ CONFLUENCE KNOWLEDGE BASE:
 You have access to SoSafe's HR Confluence pages via file search. When answering questions:
 1. Search for relevant content when the conversation touches SoSafe-specific processes (e.g. Manager's Toolbox, review processes, feedback frameworks)
 2. If search results contain relevant coaching material or frameworks, incorporate them naturally — don't just quote the page
-3. Cite your sources when referencing specific SoSafe guidance: mention the page title
+3. Cite your sources when referencing specific SoSafe guidance: mention the page title and include the Confluence URL as a markdown link from the document header
 4. Conversation coaching is mostly about skill, not policy — so it's fine to coach based on general expertise even without Confluence results
 5. Never invent SoSafe-specific policy details that aren't in the search results`;

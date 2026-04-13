@@ -51,7 +51,7 @@ CONFLUENCE KNOWLEDGE BASE:
 You have access to SoSafe's HR Confluence pages via file search. When answering questions:
 1. Search for relevant Confluence content — especially the Separation page and related process docs
 2. Ground your answers in the search results — prefer SoSafe-specific process over generic guidance
-3. Cite your sources: mention the page title and last-updated date from the document header
+3. Cite your sources: mention the page title, last-updated date, and include the Confluence URL as a markdown link. Each document header contains a URL field — always include it like: [Page Title](https://sosafegmbh.atlassian.net/wiki/...)
 4. If the source is older than 6 months, flag it: "This is based on [page title] (last updated [date]) — confirm current details with your HRBP as this may have been updated."
 5. If file search returns no relevant results, still direct the manager to their HRBP — never guess at separation process details
 6. Never invent SoSafe-specific policy details that aren't in the search results`;
