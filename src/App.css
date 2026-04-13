@@ -531,9 +531,14 @@ body {
   padding: 0;
 }
 
+.welcome-input .chat-input-area {
+  background: transparent;
+}
+
 .welcome-input .chat-input-wrapper {
   box-shadow: var(--shadow);
   background: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
 }
 
 [data-theme="dark"] .welcome-input .chat-input-wrapper {
