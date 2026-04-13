@@ -450,17 +450,17 @@ body {
   background-size: 400px;
 }
 
-/* Soft overlay to blend the tiled image */
+/* Light vignette to focus attention on the center card */
 .welcome::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, rgba(250, 249, 251, 0.55) 0%, rgba(250, 249, 251, 0.3) 100%);
+  background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(250, 249, 251, 0.35) 100%);
   pointer-events: none;
 }
 
 [data-theme="dark"] .welcome::before {
-  background: radial-gradient(ellipse at 50% 50%, rgba(14, 13, 19, 0.7) 0%, rgba(14, 13, 19, 0.5) 100%);
+  background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(14, 13, 19, 0.5) 100%);
 }
 
 .welcome-content {
