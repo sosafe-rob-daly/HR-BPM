@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import Markdown from 'react-markdown';
 import type { Message } from './types/chat';
 import type { SavedChat } from './types/chat';
 import { sendMessage, buildHistory, getApiKey, validateConnection } from './api';
@@ -211,7 +212,21 @@ export default function App() {
             <div className="message-thread" ref={threadRef}>
               {activeChat.messages.map((msg) => (
                 <div key={msg.id} className={`message message--${msg.role}`}>
-                  <div className="message-bubble">{msg.content}</div>
+                  <div className="message-bubble">
+                  {msg.role === 'agent' ? (
+                    <Markdown
+                      components={{
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </Markdown>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
 
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="message-sources">
