@@ -1,8 +1,31 @@
+import type { SavedChat } from '../types/chat';
+
 interface SidebarProps {
-  topic: string | null;
+  chats: SavedChat[];
+  activeChatId: string | null;
+  onSelectChat: (id: string) => void;
+  onNewChat: () => void;
+  onDeleteChat: (id: string) => void;
 }
 
-export default function Sidebar({ topic }: SidebarProps) {
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+export default function Sidebar({
+  chats,
+  activeChatId,
+  onSelectChat,
+  onNewChat,
+  onDeleteChat,
+}: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -10,27 +33,46 @@ export default function Sidebar({ topic }: SidebarProps) {
         <h1>HR-BPM</h1>
       </div>
 
-      <div className="sidebar-section-label">Current context</div>
-      <div className="sidebar-context">
-        <div className="sidebar-context-label">Talking about</div>
-        <div className="sidebar-context-value">
-          {topic ?? 'No active topic — describe a situation to get started'}
-        </div>
-      </div>
+      <button className="sidebar-new-btn" onClick={onNewChat}>
+        + New conversation
+      </button>
 
-      <div className="sidebar-section-label">I can help with</div>
-      <div className="sidebar-capabilities">
-        <div className="sidebar-capability">Policy guidance grounded in SoSafe Confluence</div>
-        <div className="sidebar-capability">Coaching for difficult conversations</div>
-        <div className="sidebar-capability">Performance management process</div>
-        <div className="sidebar-capability">Absence &amp; leave questions</div>
-        <div className="sidebar-capability">Escalation to a human HRBP</div>
+      <div className="sidebar-chats">
+        {chats.map((chat) => (
+          <div
+            key={chat.id}
+            className={`sidebar-chat ${chat.id === activeChatId ? 'sidebar-chat--active' : ''}`}
+            onClick={() => onSelectChat(chat.id)}
+          >
+            <div className="sidebar-chat-title">{chat.title}</div>
+            <div className="sidebar-chat-meta">
+              {chat.topic && <span className="sidebar-chat-topic">{chat.topic}</span>}
+              <span className="sidebar-chat-time">{timeAgo(chat.updatedAt)}</span>
+            </div>
+            <button
+              className="sidebar-chat-delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteChat(chat.id);
+              }}
+              title="Delete conversation"
+            >
+              &times;
+            </button>
+          </div>
+        ))}
+
+        {chats.length === 0 && (
+          <div className="sidebar-empty">
+            No conversations yet
+          </div>
+        )}
       </div>
 
       <div className="sidebar-spacer" />
 
       <div className="sidebar-footer">
-        Time-sensitive information is always flagged with its source and recency.
+        Time-sensitive info is flagged with source and recency.
         When in doubt, confirm with your HRBP.
       </div>
     </aside>

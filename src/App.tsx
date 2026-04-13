@@ -1,16 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Message } from './types/chat';
+import type { SavedChat } from './types/chat';
 import { sendMessage, buildHistory, getApiKey, validateConnection } from './api';
 import type { ConnectionStatus } from './api';
+import { getChats, saveChat, deleteChat, createChat, titleFromMessages } from './store';
 import Sidebar from './components/Sidebar';
 import ChatInput from './components/ChatInput';
 import Welcome from './components/Welcome';
 import Settings from './components/Settings';
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [topic, setTopic] = useState<string | null>(null);
-  const [route, setRoute] = useState<string | null>(null);
+  const [chats, setChats] = useState<SavedChat[]>(getChats);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -21,7 +22,8 @@ export default function App() {
   });
   const threadRef = useRef<HTMLDivElement>(null);
 
-  // Validate on mount if key exists
+  const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
+
   useEffect(() => {
     if (getApiKey()) {
       validateConnection().then(setConnection);
@@ -36,7 +38,27 @@ export default function App() {
     });
   }, []);
 
-  useEffect(scrollToBottom, [messages, scrollToBottom]);
+  useEffect(scrollToBottom, [activeChat?.messages.length, scrollToBottom]);
+
+  const refreshChats = useCallback(() => {
+    setChats(getChats());
+  }, []);
+
+  const handleNewChat = useCallback(() => {
+    setActiveChatId(null);
+    setError(null);
+  }, []);
+
+  const handleSelectChat = useCallback((id: string) => {
+    setActiveChatId(id);
+    setError(null);
+  }, []);
+
+  const handleDeleteChat = useCallback((id: string) => {
+    deleteChat(id);
+    if (activeChatId === id) setActiveChatId(null);
+    refreshChats();
+  }, [activeChatId, refreshChats]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -46,6 +68,16 @@ export default function App() {
       }
 
       setError(null);
+
+      // Create or use existing chat
+      let chat: SavedChat;
+      if (activeChat) {
+        chat = { ...activeChat };
+      } else {
+        chat = createChat();
+        setActiveChatId(chat.id);
+      }
+
       const userMsg: Message = {
         id: `user-${Date.now()}`,
         role: 'user',
@@ -53,11 +85,15 @@ export default function App() {
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, userMsg]);
+      chat.messages = [...chat.messages, userMsg];
+      chat.title = titleFromMessages(chat.messages);
+      chat.updatedAt = Date.now();
+      saveChat(chat);
+      refreshChats();
       setResponding(true);
 
       try {
-        const history = buildHistory(messages);
+        const history = buildHistory(chat.messages);
         const result = await sendMessage(text, history);
 
         const agentMsg: Message = {
@@ -67,9 +103,12 @@ export default function App() {
           timestamp: new Date(),
         };
 
-        setMessages((prev) => [...prev, agentMsg]);
-        setTopic(result.topic);
-        setRoute(result.route);
+        chat.messages = [...chat.messages, agentMsg];
+        chat.topic = result.topic;
+        chat.route = result.route;
+        chat.updatedAt = Date.now();
+        saveChat(chat);
+        refreshChats();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Something went wrong';
         setError(msg);
@@ -81,14 +120,20 @@ export default function App() {
         setResponding(false);
       }
     },
-    [messages],
+    [activeChat, refreshChats],
   );
 
-  const hasMessages = messages.length > 0;
+  const hasMessages = activeChat && activeChat.messages.length > 0;
 
   return (
     <div className="app">
-      <Sidebar topic={topic} />
+      <Sidebar
+        chats={chats}
+        activeChatId={activeChatId}
+        onSelectChat={handleSelectChat}
+        onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
+      />
       <div className="chat-panel">
         <div className="chat-header">
           <div
@@ -99,7 +144,7 @@ export default function App() {
           {connection.connected && (
             <span className="connection-badge">{connection.model}</span>
           )}
-          {route && <span className="route-badge">{route}</span>}
+          {activeChat?.route && <span className="route-badge">{activeChat.route}</span>}
           <div style={{ flex: 1 }} />
           {!connection.connected && (
             <button className="setup-hint" onClick={() => setSettingsOpen(true)}>
@@ -117,7 +162,7 @@ export default function App() {
 
         {hasMessages ? (
           <div className="message-thread" ref={threadRef}>
-            {messages.map((msg) => (
+            {activeChat.messages.map((msg) => (
               <div key={msg.id} className={`message message--${msg.role}`}>
                 <div className="message-bubble">{msg.content}</div>
 
@@ -160,7 +205,7 @@ export default function App() {
             )}
           </div>
         ) : (
-          <Welcome onPrompt={handleSend} />
+          <Welcome onSend={handleSend} disabled={responding} />
         )}
 
         {error && (
@@ -169,7 +214,7 @@ export default function App() {
           </div>
         )}
 
-        <ChatInput onSend={handleSend} disabled={responding} />
+        {hasMessages && <ChatInput onSend={handleSend} disabled={responding} />}
       </div>
 
       <Settings

@@ -17,6 +17,15 @@ export interface MessageFlag {
   label: string;
 }
 
+export interface SavedChat {
+  id: string;
+  title: string;
+  messages: Message[];
+  topic: string | null;
+  route: string | null;
+  updatedAt: number;
+}
+
 export interface Conversation {
   messages: Message[];
   topic: string | null;

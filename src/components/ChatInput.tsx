@@ -3,9 +3,10 @@ import { useState, useRef, useCallback } from 'react';
 interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,7 +40,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         <textarea
           ref={textareaRef}
           className="chat-input"
-          placeholder="Describe a people situation you need help with..."
+          placeholder={placeholder ?? "Describe a people situation you need help with..."}
           value={value}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
