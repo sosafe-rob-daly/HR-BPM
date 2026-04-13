@@ -33,11 +33,12 @@ const ROUTE_LABELS: Record<string, string> = {
 const STORAGE_KEY = 'hr-bpm-openai-key';
 
 export function getApiKey(): string | null {
-  return localStorage.getItem(STORAGE_KEY);
+  const key = localStorage.getItem(STORAGE_KEY);
+  return key ? key.trim() : null;
 }
 
 export function setApiKey(key: string) {
-  localStorage.setItem(STORAGE_KEY, key);
+  localStorage.setItem(STORAGE_KEY, key.trim());
 }
 
 export function clearApiKey() {

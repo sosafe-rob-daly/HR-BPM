@@ -103,9 +103,15 @@ export default function Settings({ open, onClose, onStatusChange, onThemeChange 
             placeholder="sk-..."
             value={key}
             onChange={(e) => {
-              setKey(e.target.value);
+              setKey(e.target.value.replace(/\s/g, ''));
               setSaved(false);
               setStatus(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSave();
+              }
             }}
           />
           <div className="settings-actions">
