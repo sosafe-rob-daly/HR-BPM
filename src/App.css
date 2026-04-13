@@ -134,10 +134,11 @@ body {
 
 .sidebar-brand {
   padding: 4px 6px 8px;
+  text-align: center;
 }
 
 .sidebar-logo {
-  height: 26px;
+  height: 39px;
   width: auto;
   opacity: 0.85;
 }
