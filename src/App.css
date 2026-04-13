@@ -529,7 +529,7 @@ body {
 .welcome h2 {
   font-size: 22px;
   font-weight: 500;
-  color: var(--text-2);
+  color: var(--text-0);
   letter-spacing: -0.01em;
 }
 
