@@ -1,0 +1,16 @@
+{
+  "name": "hr-bpm-slack-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx bot.ts",
+    "dev": "tsx watch bot.ts"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.7.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
