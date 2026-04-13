@@ -35,6 +35,14 @@ const ROUTE_EMOJI: Record<string, string> = {
   separation: ':handshake:',
 };
 
+const ROUTE_LABELS: Record<string, string> = {
+  escalation: 'Escalation triage',
+  performance: 'Performance management',
+  conversation: 'Difficult conversations',
+  policy: 'Policy & process',
+  separation: 'Separation & termination',
+};
+
 // ── Classifier prompt ───────────────────────────────────────────────
 
 const CLASSIFIER_PROMPT = `You are the intake router for SoSafe's HR Business Partner agent. Your only job is to read a people manager's message and route it to the correct specialist agent. You do not answer HR questions yourself.
@@ -220,60 +228,89 @@ app.use(async ({ body, next }) => {
 });
 
 // Handle DMs
-app.message(async ({ message, say }) => {
+app.message(async ({ message, say, client }) => {
   console.log('[message]', JSON.stringify(message, null, 2));
   // Only handle actual user messages (not bot messages, edits, etc.)
   if (!('text' in message) || !message.text || ('bot_id' in message)) return;
   console.log('[processing]', message.text);
 
+  const channel = message.channel;
   const threadTs = ('thread_ts' in message ? message.thread_ts : message.ts) as string;
 
+  // Post a progress message we'll update as we go
+  const progress = await say({ text: ':hourglass_flowing_sand: Classifying your question...', thread_ts: threadTs });
+  const progressTs = (progress as { ts: string }).ts;
+
+  const updateProgress = async (text: string) => {
+    await client.chat.update({ channel, ts: progressTs, text });
+  };
+
   try {
-    // Show typing indicator
-    await say({ text: '_Thinking..._', thread_ts: threadTs });
-
-    const { response, route } = await handleMessage(message.text, threadTs);
+    const { route } = await classify(message.text);
     const emoji = ROUTE_EMOJI[route] ?? ':brain:';
+    await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route} — generating response...`);
 
-    await say({
-      text: `${emoji} ${response}`,
-      thread_ts: threadTs,
-    });
+    const assistantId = ASSISTANT_IDS[route] ?? ASSISTANT_IDS.policy;
+    let threadId = threadMap.get(threadTs);
+    if (!threadId) {
+      threadId = await createThread();
+      threadMap.set(threadTs, threadId);
+    }
+
+    await addMessage(threadId, message.text);
+    const runId = await createRun(threadId, assistantId);
+    await waitForRun(threadId, runId);
+    const response = await getLastMessage(threadId);
+
+    // Replace progress message with the final response
+    await updateProgress(`${emoji} ${response}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Something went wrong';
     console.error('Error handling message:', msg);
-    await say({
-      text: `:warning: Sorry, I ran into an issue: ${msg}`,
-      thread_ts: threadTs,
-    });
+    await updateProgress(`:warning: Sorry, I ran into an issue: ${msg}`);
   }
 });
 
 // Handle @mentions in channels
-app.event('app_mention', async ({ event, say }) => {
+app.event('app_mention', async ({ event, say, client }) => {
   const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
   if (!text) {
     await say({ text: "Hi! Describe a people situation and I'll help.", thread_ts: event.ts });
     return;
   }
 
+  const channel = event.channel;
   const threadTs = event.thread_ts ?? event.ts;
 
-  try {
-    const { response, route } = await handleMessage(text, threadTs);
-    const emoji = ROUTE_EMOJI[route] ?? ':brain:';
+  const progress = await say({ text: ':hourglass_flowing_sand: Classifying your question...', thread_ts: threadTs });
+  const progressTs = (progress as { ts: string }).ts;
 
-    await say({
-      text: `${emoji} ${response}`,
-      thread_ts: threadTs,
-    });
+  const updateProgress = async (msg: string) => {
+    await client.chat.update({ channel, ts: progressTs, text: msg });
+  };
+
+  try {
+    const { route } = await classify(text);
+    const emoji = ROUTE_EMOJI[route] ?? ':brain:';
+    await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route} — generating response...`);
+
+    const assistantId = ASSISTANT_IDS[route] ?? ASSISTANT_IDS.policy;
+    let threadId = threadMap.get(threadTs);
+    if (!threadId) {
+      threadId = await createThread();
+      threadMap.set(threadTs, threadId);
+    }
+
+    await addMessage(threadId, text);
+    const runId = await createRun(threadId, assistantId);
+    await waitForRun(threadId, runId);
+    const response = await getLastMessage(threadId);
+
+    await updateProgress(`${emoji} ${response}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Something went wrong';
     console.error('Error handling mention:', msg);
-    await say({
-      text: `:warning: Sorry, I ran into an issue: ${msg}`,
-      thread_ts: threadTs,
-    });
+    await updateProgress(`:warning: Sorry, I ran into an issue: ${msg}`);
   }
 });
 
