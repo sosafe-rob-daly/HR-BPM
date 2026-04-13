@@ -29,8 +29,7 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">BP</div>
-        <h1>HR-BPM</h1>
+        <img src={import.meta.env.BASE_URL + 'sosafe-logo.png'} alt="SoSafe" className="sidebar-logo" />
       </div>
 
       <button className="sidebar-new-btn" onClick={onNewChat}>

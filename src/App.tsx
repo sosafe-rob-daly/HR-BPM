@@ -23,6 +23,8 @@ export default function App() {
   const threadRef = useRef<HTMLDivElement>(null);
 
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
+  const hasMessages = activeChat && activeChat.messages.length > 0;
+  const showSidebar = chats.length > 0 || hasMessages;
 
   useEffect(() => {
     if (getApiKey()) {
@@ -69,7 +71,6 @@ export default function App() {
 
       setError(null);
 
-      // Create or use existing chat
       let chat: SavedChat;
       if (activeChat) {
         chat = { ...activeChat };
@@ -123,17 +124,17 @@ export default function App() {
     [activeChat, refreshChats],
   );
 
-  const hasMessages = activeChat && activeChat.messages.length > 0;
-
   return (
-    <div className="app">
-      <Sidebar
-        chats={chats}
-        activeChatId={activeChatId}
-        onSelectChat={handleSelectChat}
-        onNewChat={handleNewChat}
-        onDeleteChat={handleDeleteChat}
-      />
+    <div className={`app ${showSidebar ? '' : 'app--no-sidebar'}`}>
+      {showSidebar && (
+        <Sidebar
+          chats={chats}
+          activeChatId={activeChatId}
+          onSelectChat={handleSelectChat}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
+        />
+      )}
       <div className="chat-panel">
         <div className="chat-header">
           <div
