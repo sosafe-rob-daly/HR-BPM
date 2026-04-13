@@ -172,6 +172,7 @@ export default function App() {
         : { background: theme.color ?? undefined }
       }
     >
+      {showSidebar && <div className="app-frost" />}
       {showSidebar && (
         <Sidebar
           chats={chats}
@@ -261,7 +262,7 @@ export default function App() {
           </div>
         ) : (
           <>
-            <Welcome onSend={handleSend} disabled={responding} themeId={themeId} />
+            <Welcome onSend={handleSend} disabled={responding} />
             {error && (
               <div className="chat-error">
                 {error}

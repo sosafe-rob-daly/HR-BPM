@@ -103,6 +103,7 @@ body {
 /* ---- Layout ---- */
 
 .app {
+  position: relative;
   display: grid;
   grid-template-columns: 280px 1fr;
   height: 100vh;
@@ -115,21 +116,31 @@ body {
   grid-template-columns: 1fr;
 }
 
+.app-frost {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .app-frost {
+  background: rgba(14, 13, 19, 0.55);
+}
+
 /* ---- Sidebar ---- */
 
 .sidebar {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  position: relative;
+  z-index: 1;
+  background: transparent;
   display: flex;
   flex-direction: column;
   padding: 20px 14px;
   gap: 16px;
   overflow-y: auto;
-}
-
-[data-theme="dark"] .sidebar {
-  background: rgba(22, 20, 30, 0.6);
 }
 
 .sidebar-brand {
@@ -266,6 +277,8 @@ body {
 /* ---- Chat panel ---- */
 
 .chat-panel {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -279,7 +292,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin: 0 16px 16px;
+  margin: 0 16px 16px 0;
   border-radius: var(--radius-xl);
   background: var(--bg-0);
   box-shadow: var(--shadow-lg);
@@ -297,12 +310,17 @@ body {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-  background: rgba(250, 249, 251, 0.6);
+  background: transparent;
+}
+
+/* Frost the header only on the home screen (no global frost layer) */
+.app--no-sidebar .chat-header {
+  background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
-[data-theme="dark"] .chat-header {
+[data-theme="dark"] .app--no-sidebar .chat-header {
   background: rgba(14, 13, 19, 0.5);
 }
 
@@ -475,9 +493,6 @@ body {
   padding: 40px 28px;
   position: relative;
   overflow: hidden;
-  background-repeat: repeat;
-  background-size: 400px;
-  background-position: center center;
 }
 
 /* Light vignette to focus attention on the center card */

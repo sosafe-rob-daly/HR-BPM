@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
 import ChatInput from './ChatInput';
-import { getTheme } from '../themes';
 
 interface WelcomeProps {
   onSend: (text: string) => void;
   disabled?: boolean;
-  themeId?: string;
 }
 
-export default function Welcome({ onSend, disabled, themeId }: WelcomeProps) {
+export default function Welcome({ onSend, disabled }: WelcomeProps) {
   const [stage, setStage] = useState(0);
-  const theme = getTheme(themeId);
 
   useEffect(() => {
     const t1 = setTimeout(() => setStage(1), 100);
@@ -22,10 +19,7 @@ export default function Welcome({ onSend, disabled, themeId }: WelcomeProps) {
   }, []);
 
   return (
-    <div className="welcome" style={theme.image
-      ? { backgroundImage: `url(${theme.image})` }
-      : { background: theme.color ?? undefined }
-    }>
+    <div className="welcome">
       <div className="welcome-content">
         <p className={`welcome-greeting ${stage >= 1 ? 'welcome-greeting--visible' : ''}`}>
           Welcome to SoSafe HRBP
