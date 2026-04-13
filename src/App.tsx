@@ -167,7 +167,10 @@ export default function App() {
   return (
     <div
       className={`app ${showSidebar ? '' : 'app--no-sidebar'}`}
-      style={{ backgroundImage: `url(${theme.image})` }}
+      style={theme.image
+        ? { backgroundImage: `url(${theme.image})` }
+        : { background: theme.color ?? undefined }
+      }
     >
       {showSidebar && (
         <Sidebar

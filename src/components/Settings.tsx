@@ -79,7 +79,10 @@ export default function Settings({ open, onClose, onStatusChange, onThemeChange 
               >
                 <div
                   className="theme-swatch-preview"
-                  style={{ backgroundImage: `url(${t.preview})` }}
+                  style={t.preview
+                    ? { backgroundImage: `url(${t.preview})` }
+                    : { background: t.color ?? undefined }
+                  }
                 />
                 <span className="theme-swatch-name">{t.name}</span>
               </button>

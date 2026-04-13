@@ -22,7 +22,10 @@ export default function Welcome({ onSend, disabled, themeId }: WelcomeProps) {
   }, []);
 
   return (
-    <div className="welcome" style={{ backgroundImage: `url(${theme.image})` }}>
+    <div className="welcome" style={theme.image
+      ? { backgroundImage: `url(${theme.image})` }
+      : { background: theme.color ?? undefined }
+    }>
       <div className="welcome-content">
         <p className={`welcome-greeting ${stage >= 1 ? 'welcome-greeting--visible' : ''}`}>
           Welcome to SoSafe HRBP
