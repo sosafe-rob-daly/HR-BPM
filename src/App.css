@@ -283,12 +283,10 @@ body {
   background: rgba(250, 249, 251, 0.6);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 [data-theme="dark"] .chat-header {
   background: rgba(14, 13, 19, 0.5);
-  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 /* ---- Status pill ---- */
