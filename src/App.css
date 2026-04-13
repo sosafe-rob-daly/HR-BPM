@@ -269,42 +269,52 @@ body {
 }
 
 .chat-header {
-  padding: 18px 28px;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
-  background: var(--bg-0);
 }
 
-.chat-header-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
-  transition: background 0.3s;
-}
+/* ---- Status pill ---- */
 
-.chat-header-dot--off {
-  background: var(--text-3);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
-}
-
-.chat-header-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-2);
-}
-
-.connection-badge {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
   border-radius: 20px;
-  background: rgba(16, 185, 129, 0.10);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--font);
+  border: 1px solid var(--border-2);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.01em;
+}
+
+.status-pill--on {
+  background: rgba(16, 185, 129, 0.07);
   color: var(--green);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.status-pill--off {
+  background: rgba(152, 147, 173, 0.08);
+  color: var(--text-3);
+  border-color: var(--border-2);
+}
+
+.status-pill:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.status-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 /* ---- Message thread ---- */
@@ -651,34 +661,18 @@ body {
 .settings-btn {
   background: none;
   border: none;
-  font-size: 18px;
   color: var(--text-3);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px;
   border-radius: var(--radius);
   transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .settings-btn:hover {
   color: var(--text-1);
-}
-
-.setup-hint {
-  font-size: 12px;
-  color: var(--accent);
-  background: var(--accent-m);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  padding: 5px 12px;
-  cursor: pointer;
-  font-family: var(--font);
-  font-weight: 500;
-  transition: all 0.15s;
-}
-
-.setup-hint:hover {
-  background: var(--accent);
-  color: white;
 }
 
 /* ---- Settings overlay ---- */

@@ -137,27 +137,25 @@ export default function App() {
       )}
       <div className="chat-panel">
         <div className="chat-header">
-          <div
-            className={`chat-header-dot ${connection.connected ? '' : 'chat-header-dot--off'}`}
-            title={connection.connected ? `Connected · ${connection.model}` : 'Not connected'}
-          />
-          <div className="chat-header-title">HR Business Partner Agent</div>
-          {connection.connected && (
-            <span className="connection-badge">{connection.model}</span>
-          )}
+          <button
+            className={`status-pill ${connection.connected ? 'status-pill--on' : 'status-pill--off'}`}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <span className="status-pill-dot" />
+            HRBP Agent: {connection.connected ? 'connected' : 'disconnected'}
+          </button>
           {activeChat?.route && <span className="route-badge">{activeChat.route}</span>}
           <div style={{ flex: 1 }} />
-          {!connection.connected && (
-            <button className="setup-hint" onClick={() => setSettingsOpen(true)}>
-              {getApiKey() ? 'Connection failed — check key' : 'Set up API key to start'}
-            </button>
-          )}
           <button
             className="settings-btn"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
+            aria-label="Settings"
           >
-            &#9881;
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
           </button>
         </div>
 
