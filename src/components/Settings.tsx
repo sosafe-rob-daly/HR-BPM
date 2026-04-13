@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
-import { getApiKey, setApiKey, clearApiKey } from '../api';
+import { getApiKey, setApiKey, clearApiKey, validateConnection } from '../api';
+import type { ConnectionStatus } from '../api';
 
 interface SettingsProps {
   open: boolean;
   onClose: () => void;
+  onStatusChange: (status: ConnectionStatus) => void;
 }
 
-export default function Settings({ open, onClose }: SettingsProps) {
+export default function Settings({ open, onClose, onStatusChange }: SettingsProps) {
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [status, setStatus] = useState<ConnectionStatus | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -20,17 +24,27 @@ export default function Settings({ open, onClose }: SettingsProps) {
 
   if (!open) return null;
 
-  const handleSave = () => {
-    if (key.trim()) {
-      setApiKey(key.trim());
-      setSaved(true);
-    }
+  const handleSave = async () => {
+    const trimmed = key.trim();
+    if (!trimmed) return;
+
+    setApiKey(trimmed);
+    setSaved(true);
+    setValidating(true);
+    setStatus(null);
+
+    const result = await validateConnection();
+    setStatus(result);
+    setValidating(false);
+    onStatusChange(result);
   };
 
   const handleClear = () => {
     clearApiKey();
     setKey('');
     setSaved(false);
+    setStatus(null);
+    onStatusChange({ connected: false, model: null, error: null });
   };
 
   return (
@@ -56,11 +70,12 @@ export default function Settings({ open, onClose }: SettingsProps) {
             onChange={(e) => {
               setKey(e.target.value);
               setSaved(false);
+              setStatus(null);
             }}
           />
           <div className="settings-actions">
-            <button className="settings-save" onClick={handleSave} disabled={!key.trim()}>
-              {saved ? 'Saved' : 'Save'}
+            <button className="settings-save" onClick={handleSave} disabled={!key.trim() || validating}>
+              {validating ? 'Validating...' : saved ? 'Saved' : 'Save & verify'}
             </button>
             {saved && (
               <button className="settings-clear" onClick={handleClear}>
@@ -68,6 +83,15 @@ export default function Settings({ open, onClose }: SettingsProps) {
               </button>
             )}
           </div>
+
+          {status && (
+            <div className={`settings-status ${status.connected ? 'settings-status--ok' : 'settings-status--error'}`}>
+              <span className="settings-status-dot" />
+              {status.connected
+                ? `Connected · Model: ${status.model}`
+                : status.error}
+            </div>
+          )}
         </div>
       </div>
     </div>

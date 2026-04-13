@@ -247,12 +247,27 @@ body {
   border-radius: 50%;
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  transition: background 0.3s;
+}
+
+.chat-header-dot--off {
+  background: var(--text-3);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 .chat-header-title {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-2);
+}
+
+.connection-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(16, 185, 129, 0.10);
+  color: var(--green);
 }
 
 /* ---- Message thread ---- */
@@ -689,6 +704,35 @@ body {
 .settings-clear:hover {
   color: var(--rose);
   border-color: var(--rose);
+}
+
+.settings-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.settings-status--ok {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--green);
+}
+
+.settings-status--error {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--rose);
+}
+
+.settings-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 /* ---- Typing indicator ---- */

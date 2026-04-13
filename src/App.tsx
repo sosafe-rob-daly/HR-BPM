@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Message } from './types/chat';
-import { sendMessage, buildHistory, getApiKey } from './api';
+import { sendMessage, buildHistory, getApiKey, validateConnection } from './api';
+import type { ConnectionStatus } from './api';
 import Sidebar from './components/Sidebar';
 import ChatInput from './components/ChatInput';
 import Welcome from './components/Welcome';
@@ -13,9 +14,19 @@ export default function App() {
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [connection, setConnection] = useState<ConnectionStatus>({
+    connected: false,
+    model: null,
+    error: null,
+  });
   const threadRef = useRef<HTMLDivElement>(null);
 
-  const hasKey = !!getApiKey();
+  // Validate on mount if key exists
+  useEffect(() => {
+    if (getApiKey()) {
+      validateConnection().then(setConnection);
+    }
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -63,6 +74,7 @@ export default function App() {
         const msg = err instanceof Error ? err.message : 'Something went wrong';
         setError(msg);
         if (msg.includes('API key') || msg.includes('401')) {
+          setConnection({ connected: false, model: null, error: 'Invalid API key' });
           setSettingsOpen(true);
         }
       } finally {
@@ -79,13 +91,19 @@ export default function App() {
       <Sidebar topic={topic} />
       <div className="chat-panel">
         <div className="chat-header">
-          <div className="chat-header-dot" />
+          <div
+            className={`chat-header-dot ${connection.connected ? '' : 'chat-header-dot--off'}`}
+            title={connection.connected ? `Connected · ${connection.model}` : 'Not connected'}
+          />
           <div className="chat-header-title">HR Business Partner Agent</div>
+          {connection.connected && (
+            <span className="connection-badge">{connection.model}</span>
+          )}
           {route && <span className="route-badge">{route}</span>}
           <div style={{ flex: 1 }} />
-          {!hasKey && (
+          {!connection.connected && (
             <button className="setup-hint" onClick={() => setSettingsOpen(true)}>
-              Set up API key to start
+              {getApiKey() ? 'Connection failed — check key' : 'Set up API key to start'}
             </button>
           )}
           <button
@@ -154,7 +172,11 @@ export default function App() {
         <ChatInput onSend={handleSend} disabled={responding} />
       </div>
 
-      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <Settings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onStatusChange={setConnection}
+      />
     </div>
   );
 }

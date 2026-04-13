@@ -44,6 +44,37 @@ export function clearApiKey() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+// ── Connection validation ───────────────────────────────────────────
+
+export interface ConnectionStatus {
+  connected: boolean;
+  model: string | null;
+  error: string | null;
+}
+
+export async function validateConnection(): Promise<ConnectionStatus> {
+  const apiKey = getApiKey();
+  if (!apiKey) return { connected: false, model: null, error: 'No API key' };
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/models/' + MODEL, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (res.ok) {
+      return { connected: true, model: MODEL, error: null };
+    }
+
+    if (res.status === 401) {
+      return { connected: false, model: null, error: 'Invalid API key' };
+    }
+
+    return { connected: false, model: null, error: `API error: ${res.status}` };
+  } catch {
+    return { connected: false, model: null, error: 'Network error' };
+  }
+}
+
 // ── Classifier schema for structured output ─────────────────────────
 
 const classifierSchema = {
