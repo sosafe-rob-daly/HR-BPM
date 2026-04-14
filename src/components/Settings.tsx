@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getApiKey, setApiKey, clearApiKey, validateConnection } from '../api';
+import { getApiKey, setApiKey, clearApiKey, validateConnection, getRole, setRole } from '../api';
 import type { ConnectionStatus } from '../api';
+import type { UserRole } from '../assistants';
 import { themes, getThemeId, setThemeId } from '../themes';
 
 interface SettingsProps {
@@ -8,14 +9,16 @@ interface SettingsProps {
   onClose: () => void;
   onStatusChange: (status: ConnectionStatus) => void;
   onThemeChange: (themeId: string) => void;
+  onRoleChange: (role: UserRole) => void;
 }
 
-export default function Settings({ open, onClose, onStatusChange, onThemeChange }: SettingsProps) {
+export default function Settings({ open, onClose, onStatusChange, onThemeChange, onRoleChange }: SettingsProps) {
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [validating, setValidating] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [activeTheme, setActiveTheme] = useState(getThemeId);
+  const [activeRole, setActiveRole] = useState<UserRole>(getRole);
 
   useEffect(() => {
     if (open) {
@@ -23,6 +26,7 @@ export default function Settings({ open, onClose, onStatusChange, onThemeChange 
       setKey(existing ?? '');
       setSaved(!!existing);
       setActiveTheme(getThemeId());
+      setActiveRole(getRole());
     }
   }, [open]);
 
@@ -87,6 +91,37 @@ export default function Settings({ open, onClose, onStatusChange, onThemeChange 
                 <span className="theme-swatch-name">{t.name}</span>
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-section">
+          <label className="settings-label">Access Level (Testing)</label>
+          <p className="settings-hint">
+            Controls which knowledge base the agent searches. Managers see restricted Confluence content.
+          </p>
+          <div className="role-toggle">
+            <button
+              className={`role-option ${activeRole === 'general' ? 'role-option--active' : ''}`}
+              onClick={() => {
+                setRole('general');
+                setActiveRole('general');
+                onRoleChange('general');
+              }}
+            >
+              Individual Contributor
+            </button>
+            <button
+              className={`role-option ${activeRole === 'manager' ? 'role-option--active' : ''}`}
+              onClick={() => {
+                setRole('manager');
+                setActiveRole('manager');
+                onRoleChange('manager');
+              }}
+            >
+              Manager
+            </button>
           </div>
         </div>
 

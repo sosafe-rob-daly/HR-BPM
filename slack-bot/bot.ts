@@ -8,6 +8,14 @@ const SLACK_SIGNING_SECRET = env('SLACK_SIGNING_SECRET');
 const SLACK_APP_TOKEN = env('SLACK_APP_TOKEN');
 const OPENAI_API_KEY = env('OPENAI_API_KEY');
 
+// Confluence (for group membership check)
+const CONFLUENCE_EMAIL = process.env.CONFLUENCE_EMAIL ?? '';
+const CONFLUENCE_TOKEN = process.env.CONFLUENCE_TOKEN ?? '';
+const CONFLUENCE_BASE_URL = (process.env.CONFLUENCE_BASE_URL ?? '').replace(/\/+$/, '');
+
+// Manual email aliases: "slack-email:confluence-email,slack-email2:confluence-email2"
+const EMAIL_ALIASES_RAW = process.env.EMAIL_ALIASES ?? '';
+
 function env(name: string): string {
   const val = process.env[name];
   if (!val) { console.error(`Missing ${name}`); process.exit(1); }
@@ -19,13 +27,31 @@ function env(name: string): string {
 const OPENAI_BASE = 'https://api.openai.com/v1';
 const MODEL = 'gpt-4o';
 
-const ASSISTANT_IDS: Record<string, string> = {
-  escalation: 'asst_5Bn4Y1vuUHpvj7ZT62XCnT6m',
-  performance: 'asst_2nIW1O6mMYuGgTWpEymi0Rjx',
-  conversation: 'asst_W1dO5e9e4dzgbWNZ7VnH20ms',
-  policy: 'asst_kIEWkZwnh15NC7ikKM9opkVd',
-  separation: 'asst_4E77rMdBHx3c4Bkmoq1smqMl',
+// Dual-tier assistant IDs (placeholder — paste real IDs after running setup-assistants.ts)
+const ASSISTANT_IDS = {
+  escalation: 'asst_ILlD4D0iWja22rEpFx1Z1cHV',
+  general: {
+    performance: 'asst_rv5KDbupjOttcqsJqDSZRorg',
+    conversation: 'asst_Wznw66uGX2shOz5JhulLcqjV',
+    policy: 'asst_EezRSJ435MMhpvJWKL8i8rCd',
+    separation: 'asst_g74hv9Gq5aECXp2SCAVWsdx1',
+  },
+  manager: {
+    performance: 'asst_DLZKrLJYfdESX27RtY5FkbbG',
+    conversation: 'asst_Pa81conwymSnxuaMjVxTLJRW',
+    policy: 'asst_gylPFYTBBaAARzbp3anuC2Zw',
+    separation: 'asst_tKTquBvJ8afrtW1XXU2lajBV',
+  },
 };
+
+type UserRole = 'general' | 'manager';
+type DomainRoute = 'performance' | 'conversation' | 'policy' | 'separation';
+
+function getAssistantId(route: string, role: UserRole): string {
+  if (route === 'escalation') return ASSISTANT_IDS.escalation;
+  const tier = ASSISTANT_IDS[role];
+  return tier[route as DomainRoute] ?? tier.policy;
+}
 
 const ROUTE_EMOJI: Record<string, string> = {
   escalation: ':rotating_light:',
@@ -42,6 +68,122 @@ const ROUTE_LABELS: Record<string, string> = {
   policy: 'Policy & process',
   separation: 'Separation & termination',
 };
+
+// ── Manager group membership ────────────────────────────────────────
+
+let managerEmails = new Set<string>();
+let managerGroupLastRefresh = 0;
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+// Email alias map: slack email → confluence email
+const emailAliases = new Map<string, string>();
+
+function loadEmailAliases() {
+  if (!EMAIL_ALIASES_RAW) return;
+  for (const pair of EMAIL_ALIASES_RAW.split(',')) {
+    const [from, to] = pair.split(':').map((s) => s.trim().toLowerCase());
+    if (from && to) emailAliases.set(from, to);
+  }
+  if (emailAliases.size > 0) {
+    console.log(`  Loaded ${emailAliases.size} email aliases`);
+  }
+}
+
+async function refreshManagerGroup() {
+  if (!CONFLUENCE_EMAIL || !CONFLUENCE_TOKEN || !CONFLUENCE_BASE_URL) {
+    console.log('[role] Confluence credentials not set — all users get general tier');
+    return;
+  }
+
+  const now = Date.now();
+  if (now - managerGroupLastRefresh < REFRESH_INTERVAL_MS && managerEmails.size > 0) return;
+
+  console.log('[role] Refreshing team-leadership group membership...');
+  const auth = Buffer.from(`${CONFLUENCE_EMAIL}:${CONFLUENCE_TOKEN}`).toString('base64');
+  const emails = new Set<string>();
+  let startAt = 0;
+  const maxResults = 50;
+
+  try {
+    while (true) {
+      const res = await fetch(
+        `${CONFLUENCE_BASE_URL}/rest/api/latest/group/member?groupname=team-leadership&limit=${maxResults}&startAt=${startAt}`,
+        { headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' } },
+      );
+
+      if (!res.ok) {
+        console.error(`[role] Failed to fetch group: ${res.status}`);
+        break;
+      }
+
+      const data = (await res.json()) as {
+        values: { emailAddress?: string }[];
+        isLast: boolean;
+        total: number;
+      };
+
+      for (const member of data.values) {
+        if (member.emailAddress) {
+          emails.add(member.emailAddress.toLowerCase());
+        }
+      }
+
+      if (data.isLast) break;
+      startAt += maxResults;
+    }
+
+    managerEmails = emails;
+    managerGroupLastRefresh = now;
+    console.log(`[role] Loaded ${managerEmails.size} manager emails`);
+  } catch (err) {
+    console.error('[role] Error refreshing group:', err);
+  }
+}
+
+function isManager(email: string): boolean {
+  const normalized = email.toLowerCase();
+  if (managerEmails.has(normalized)) return true;
+
+  // Check aliases
+  const aliased = emailAliases.get(normalized);
+  if (aliased && managerEmails.has(aliased)) return true;
+
+  return false;
+}
+
+// Slack user ID → email cache
+const userEmailCache = new Map<string, string>();
+
+async function getUserEmail(client: bolt.WebClient, userId: string): Promise<string | null> {
+  if (userEmailCache.has(userId)) return userEmailCache.get(userId)!;
+
+  try {
+    const result = await client.users.info({ user: userId });
+    const email = result.user?.profile?.email;
+    if (email) {
+      userEmailCache.set(userId, email.toLowerCase());
+      return email.toLowerCase();
+    }
+  } catch (err) {
+    console.error(`[role] Failed to get email for ${userId}:`, err);
+  }
+
+  return null;
+}
+
+async function getUserRole(client: bolt.WebClient, userId: string): Promise<UserRole> {
+  await refreshManagerGroup();
+
+  const email = await getUserEmail(client, userId);
+  if (!email) {
+    console.log(`[role] No email for ${userId} — defaulting to general`);
+    return 'general';
+  }
+
+  const role = isManager(email) ? 'manager' : 'general';
+  console.log(`[role] ${email} → ${role}`);
+  return role;
+}
 
 // ── Classifier prompt ───────────────────────────────────────────────
 
@@ -139,7 +281,6 @@ async function classify(text: string): Promise<ClassifierResult> {
 
 // ── Assistants API ──────────────────────────────────────────────────
 
-// Thread cache: Slack thread_ts → OpenAI thread_id
 const threadMap = new Map<string, string>();
 
 async function createThread(): Promise<string> {
@@ -157,7 +298,7 @@ async function addMessage(threadId: string, content: string) {
 async function createRun(threadId: string, assistantId: string): Promise<string> {
   const data = await oaiJson(`/threads/${threadId}/runs`, {
     method: 'POST',
-    body: JSON.stringify({ assistant_id: assistantId }),
+    body: JSON.stringify({ assistant_id: assistantId, temperature: 0.2 }),
   }) as { id: string };
   return data.id;
 }
@@ -183,33 +324,8 @@ async function getLastMessage(threadId: string): Promise<string> {
   const msg = data.data[0];
   if (!msg || msg.role !== 'assistant') throw new Error('No assistant response');
   const textBlock = msg.content.find((c) => c.type === 'text');
-  // Strip OpenAI citation markers like 【4:0†source】
   const raw = textBlock?.text?.value ?? '';
   return raw.replace(/【\d+:\d+†[^】]*】/g, '');
-}
-
-// ── Core: handle a message ──────────────────────────────────────────
-
-async function handleMessage(text: string, slackThreadTs: string): Promise<{ response: string; route: string }> {
-  // 1. Classify
-  const { route } = await classify(text);
-  const assistantId = ASSISTANT_IDS[route] ?? ASSISTANT_IDS.policy;
-
-  // 2. Get or create OpenAI thread (keyed by Slack thread)
-  let threadId = threadMap.get(slackThreadTs);
-  if (!threadId) {
-    threadId = await createThread();
-    threadMap.set(slackThreadTs, threadId);
-  }
-
-  // 3. Run the assistant
-  await addMessage(threadId, text);
-  const runId = await createRun(threadId, assistantId);
-  await waitForRun(threadId, runId);
-
-  // 4. Get response
-  const response = await getLastMessage(threadId);
-  return { response, route };
 }
 
 // ── Slack app ───────────────────────────────────────────────────────
@@ -221,24 +337,18 @@ const app = new App({
   appToken: SLACK_APP_TOKEN,
 });
 
-// Log all events for debugging
-app.use(async ({ body, next }) => {
-  console.log('[event]', body.event?.type ?? body.type ?? 'unknown');
-  await next();
-});
-
 // Handle DMs
 app.message(async ({ message, say, client }) => {
-  // Only handle actual user messages (not bot messages, edits, subtypes)
   if ('subtype' in message) return;
   if (!('text' in message) || !message.text) return;
   if ('bot_id' in message) return;
-  console.log('[processing]', message.text);
+
+  const userId = (message as { user: string }).user;
+  console.log(`[processing] ${message.text} (user: ${userId})`);
 
   const channel = message.channel;
   const threadTs = ('thread_ts' in message ? message.thread_ts : message.ts) as string;
 
-  // Post a progress message we'll update as we go
   const progress = await say({ text: ':hourglass_flowing_sand: Classifying your question...', thread_ts: threadTs });
   const progressTs = (progress as { ts: string }).ts;
 
@@ -247,11 +357,15 @@ app.message(async ({ message, say, client }) => {
   };
 
   try {
+    // Determine user role
+    const role = await getUserRole(client, userId);
+
     const { route } = await classify(message.text);
     const emoji = ROUTE_EMOJI[route] ?? ':brain:';
-    await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route} — generating response...`);
+    const roleLabel = role === 'manager' ? ' :star:' : '';
+    await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route}${roleLabel} — generating response...`);
 
-    const assistantId = ASSISTANT_IDS[route] ?? ASSISTANT_IDS.policy;
+    const assistantId = getAssistantId(route, role);
     let threadId = threadMap.get(threadTs);
     if (!threadId) {
       threadId = await createThread();
@@ -263,7 +377,6 @@ app.message(async ({ message, say, client }) => {
     await waitForRun(threadId, runId);
     const response = await getLastMessage(threadId);
 
-    // Replace progress message with the final response
     await updateProgress(`${emoji} ${response}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Something went wrong';
@@ -280,6 +393,7 @@ app.event('app_mention', async ({ event, say, client }) => {
     return;
   }
 
+  const userId = event.user;
   const channel = event.channel;
   const threadTs = event.thread_ts ?? event.ts;
 
@@ -291,11 +405,14 @@ app.event('app_mention', async ({ event, say, client }) => {
   };
 
   try {
+    const role = await getUserRole(client, userId);
+
     const { route } = await classify(text);
     const emoji = ROUTE_EMOJI[route] ?? ':brain:';
-    await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route} — generating response...`);
+    const roleLabel = role === 'manager' ? ' :star:' : '';
+    await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route}${roleLabel} — generating response...`);
 
-    const assistantId = ASSISTANT_IDS[route] ?? ASSISTANT_IDS.policy;
+    const assistantId = getAssistantId(route, role);
     let threadId = threadMap.get(threadTs);
     if (!threadId) {
       threadId = await createThread();
@@ -318,7 +435,11 @@ app.event('app_mention', async ({ event, say, client }) => {
 // ── Start ───────────────────────────────────────────────────────────
 
 (async () => {
+  loadEmailAliases();
+  await refreshManagerGroup();
   await app.start();
   console.log('\n⚡ SoSafe HRBP Slack bot is running!\n');
-  console.log('  DM me or @mention me in a channel.\n');
+  console.log('  DM me or @mention me in a channel.');
+  console.log(`  Manager group: ${managerEmails.size} members loaded.`);
+  console.log(`  Email aliases: ${emailAliases.size} configured.\n`);
 })();

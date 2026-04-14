@@ -1,17 +1,20 @@
 #!/usr/bin/env npx tsx
 /**
- * Confluence → OpenAI Vector Store Sync
+ * Confluence → OpenAI Vector Store Sync (Dual Store)
  *
- * Fetches all pages from the HRKB Confluence space, strips HTML,
- * and uploads them as documents to an OpenAI vector store.
+ * Fetches all pages from the HRKB Confluence space, checks page
+ * restrictions, and uploads to TWO vector stores:
+ *   - General: pages with no read restrictions (safe for everyone)
+ *   - Manager: ALL pages (general + restricted)
  *
  * Environment variables:
- *   CONFLUENCE_EMAIL    — Atlassian account email
- *   CONFLUENCE_TOKEN    — Atlassian API token (standard, not scoped)
- *   CONFLUENCE_BASE_URL — e.g. https://sosafegmbh.atlassian.net
- *   OPENAI_API_KEY      — OpenAI API key
- *   VECTOR_STORE_ID     — (optional) existing vector store ID to update; creates new if omitted
- *   CONFLUENCE_SPACE    — (optional) space key, defaults to HRKB
+ *   CONFLUENCE_EMAIL          — Atlassian account email
+ *   CONFLUENCE_TOKEN          — Atlassian API token (standard, not scoped)
+ *   CONFLUENCE_BASE_URL       — e.g. https://sosafegmbh.atlassian.net
+ *   OPENAI_API_KEY            — OpenAI API key
+ *   VECTOR_STORE_ID_GENERAL   — (optional) existing general store ID
+ *   VECTOR_STORE_ID_MANAGER   — (optional) existing manager store ID
+ *   CONFLUENCE_SPACE          — (optional) space key, defaults to HRKB
  *
  * Usage:
  *   export CONFLUENCE_EMAIL="rob.daly@sosafe.de"
@@ -28,7 +31,8 @@ const CONFLUENCE_TOKEN = env('CONFLUENCE_TOKEN');
 const CONFLUENCE_BASE_URL = env('CONFLUENCE_BASE_URL').replace(/\/+$/, '');
 const OPENAI_API_KEY = env('OPENAI_API_KEY');
 const SPACE_KEY = process.env.CONFLUENCE_SPACE ?? 'HRKB';
-const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID ?? null;
+const STORE_ID_GENERAL = process.env.VECTOR_STORE_ID_GENERAL ?? null;
+const STORE_ID_MANAGER = process.env.VECTOR_STORE_ID_MANAGER ?? null;
 
 function env(name: string): string {
   const val = process.env[name];
@@ -48,6 +52,8 @@ interface ConfluencePage {
   body?: { storage?: { value: string } };
   _links: { webui: string };
 }
+
+type AccessLevel = 'general' | 'restricted';
 
 const confluenceAuth = Buffer.from(`${CONFLUENCE_EMAIL}:${CONFLUENCE_TOKEN}`).toString('base64');
 
@@ -90,25 +96,107 @@ async function fetchPageBody(pageId: string): Promise<string> {
   return data.body?.storage?.value ?? '';
 }
 
+async function fetchPageAccessLevel(pageId: string): Promise<AccessLevel> {
+  try {
+    const data = (await confluenceFetch(
+      `/content/${pageId}/restriction`,
+    )) as { results: { operation: string; restrictions: { group: { results: unknown[]; size: number } } }[] };
+
+    for (const restriction of data.results) {
+      if (restriction.operation === 'read') {
+        const groupCount = restriction.restrictions?.group?.size ?? 0;
+        if (groupCount > 0) return 'restricted';
+      }
+    }
+
+    return 'general';
+  } catch {
+    // If restriction endpoint fails, default to restricted (safe)
+    return 'restricted';
+  }
+}
+
+/** Fetch all descendant page IDs of a given page via CQL search. */
+async function fetchDescendantIds(pageId: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  let start = 0;
+  const limit = 50;
+
+  while (true) {
+    const data = (await confluenceFetch(
+      `/content/search?cql=ancestor=${pageId}%20and%20space=${SPACE_KEY}&limit=${limit}&start=${start}`,
+    )) as { results: { id: string }[]; size: number };
+
+    for (const page of data.results) {
+      ids.add(page.id);
+    }
+
+    if (data.size < limit) break;
+    start += limit;
+  }
+
+  return ids;
+}
+
+/**
+ * Build a complete access map that accounts for inherited restrictions.
+ * 1. Check each page for explicit restrictions
+ * 2. For any restricted page, mark all its descendants as restricted too
+ */
+async function buildAccessMap(pages: ConfluencePage[]): Promise<Map<string, AccessLevel>> {
+  const accessMap = new Map<string, AccessLevel>();
+  const explicitlyRestricted: string[] = [];
+
+  // Pass 1: check explicit restrictions
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const level = await fetchPageAccessLevel(page.id);
+    accessMap.set(page.id, level);
+    if (level === 'restricted') explicitlyRestricted.push(page.id);
+
+    if ((i + 1) % 10 === 0 || i === pages.length - 1) {
+      const general = [...accessMap.values()].filter((v) => v === 'general').length;
+      const restricted = [...accessMap.values()].filter((v) => v === 'restricted').length;
+      console.log(`  [${i + 1}/${pages.length}] general: ${general}, restricted: ${restricted}`);
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  // Pass 2: for each explicitly restricted page, mark all descendants as restricted
+  if (explicitlyRestricted.length > 0) {
+    console.log(`\n  Checking inherited restrictions for ${explicitlyRestricted.length} restricted pages...`);
+    let inherited = 0;
+    for (const pageId of explicitlyRestricted) {
+      const descendantIds = await fetchDescendantIds(pageId);
+      for (const descId of descendantIds) {
+        if (accessMap.get(descId) === 'general') {
+          accessMap.set(descId, 'restricted');
+          inherited++;
+        }
+      }
+    }
+    console.log(`  Marked ${inherited} additional pages as restricted (inherited).`);
+  }
+
+  return accessMap;
+}
+
 // ── HTML → Plain text ───────────────────────────────────────────────
 
 function stripHtml(html: string): string {
   return html
-    // Replace common block elements with newlines
+    // Preserve links as markdown before stripping tags
+    .replace(/<a[^>]+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
     .replace(/<\/(p|div|h[1-6]|li|tr|br\s*\/?)>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
-    // Replace table cells with tabs
     .replace(/<\/(td|th)>/gi, '\t')
-    // Strip remaining tags
     .replace(/<[^>]+>/g, '')
-    // Decode common HTML entities
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
-    // Clean up whitespace
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n/g, '\n\n')
     .trim();
@@ -123,14 +211,19 @@ interface SyncDocument {
   title: string;
   lastUpdated: string;
   url: string;
+  accessLevel: AccessLevel;
 }
 
-async function prepareDocuments(pages: ConfluencePage[]): Promise<SyncDocument[]> {
+async function prepareDocuments(
+  pages: ConfluencePage[],
+  accessMap: Map<string, AccessLevel>,
+): Promise<SyncDocument[]> {
   const docs: SyncDocument[] = [];
 
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
-    console.log(`  [${i + 1}/${pages.length}] Fetching body: ${page.title}`);
+    const accessLevel = accessMap.get(page.id) ?? 'restricted';
+    console.log(`  [${i + 1}/${pages.length}] Fetching body: ${page.title} [${accessLevel}]`);
 
     const bodyHtml = await fetchPageBody(page.id);
     const bodyText = stripHtml(bodyHtml);
@@ -149,6 +242,7 @@ async function prepareDocuments(pages: ConfluencePage[]): Promise<SyncDocument[]
       `URL: ${url}`,
       `Last updated: ${lastUpdated}`,
       `Page ID: ${page.id}`,
+      `Access: ${accessLevel}`,
       '',
       '---',
       '',
@@ -167,6 +261,7 @@ async function prepareDocuments(pages: ConfluencePage[]): Promise<SyncDocument[]
       title: page.title,
       lastUpdated,
       url,
+      accessLevel,
     });
   }
 
@@ -190,36 +285,42 @@ async function openAiFetch(path: string, options: RequestInit = {}): Promise<unk
   return res.json();
 }
 
-async function getOrCreateVectorStore(): Promise<string> {
-  if (VECTOR_STORE_ID) {
-    console.log(`  Using existing vector store: ${VECTOR_STORE_ID}`);
-    return VECTOR_STORE_ID;
+async function getOrCreateStore(existingId: string | null, name: string): Promise<string> {
+  if (existingId) {
+    console.log(`  Using existing store: ${existingId}`);
+    return existingId;
   }
 
   const data = (await openAiFetch('/vector_stores', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: `HR-BPM Confluence HRKB — ${new Date().toISOString().slice(0, 10)}`,
-    }),
+    body: JSON.stringify({ name }),
   })) as { id: string };
 
-  console.log(`  Created new vector store: ${data.id}`);
+  console.log(`  Created new store: ${data.id}`);
   return data.id;
 }
 
 async function clearVectorStore(storeId: string) {
-  // List existing files and delete them
-  const data = (await openAiFetch(`/vector_stores/${storeId}/files?limit=100`)) as {
-    data: { id: string }[];
-  };
+  let hasMore = true;
+  let cleared = 0;
 
-  if (data.data.length === 0) return;
+  while (hasMore) {
+    const data = (await openAiFetch(`/vector_stores/${storeId}/files?limit=100`)) as {
+      data: { id: string }[];
+    };
 
-  console.log(`  Clearing ${data.data.length} existing files...`);
-  for (const file of data.data) {
-    await openAiFetch(`/vector_stores/${storeId}/files/${file.id}`, { method: 'DELETE' });
+    if (data.data.length === 0) break;
+
+    for (const file of data.data) {
+      await openAiFetch(`/vector_stores/${storeId}/files/${file.id}`, { method: 'DELETE' });
+      cleared++;
+    }
+
+    hasMore = data.data.length === 100;
   }
+
+  if (cleared > 0) console.log(`  Cleared ${cleared} existing files.`);
 }
 
 async function uploadFile(content: string, filename: string): Promise<string> {
@@ -250,55 +351,84 @@ async function addFileToStore(storeId: string, fileId: string) {
   });
 }
 
-// ── Main ────────────────────────────────────────────────────────────
-
-async function main() {
-  console.log('\n🔄 HR-BPM Confluence Sync');
-  console.log('========================\n');
-
-  // 1. Fetch pages from Confluence
-  console.log(`1. Fetching pages from Confluence space ${SPACE_KEY}...`);
-  const pages = await fetchAllPages();
-  console.log(`   Found ${pages.length} pages.\n`);
-
-  // 2. Prepare documents
-  console.log('2. Fetching page bodies and preparing documents...');
-  const docs = await prepareDocuments(pages);
-  console.log(`   Prepared ${docs.length} documents (${pages.length - docs.length} skipped).\n`);
-
-  // 3. Get or create vector store
-  console.log('3. Setting up OpenAI vector store...');
-  const storeId = await getOrCreateVectorStore();
-
-  // 4. Clear existing files if updating
-  if (VECTOR_STORE_ID) {
-    console.log('4. Clearing existing files in vector store...');
-    await clearVectorStore(storeId);
-  } else {
-    console.log('4. New store, no files to clear.');
-  }
-
-  // 5. Upload documents
-  console.log(`\n5. Uploading ${docs.length} documents to vector store...`);
+async function uploadDocsToStore(storeId: string, docs: SyncDocument[], label: string) {
+  console.log(`\n  Uploading ${docs.length} documents to ${label} store...`);
   for (let i = 0; i < docs.length; i++) {
     const doc = docs[i];
-    console.log(`   [${i + 1}/${docs.length}] ${doc.title} (${doc.lastUpdated})`);
+    console.log(`   [${i + 1}/${docs.length}] ${doc.title} (${doc.lastUpdated}) [${doc.accessLevel}]`);
 
     const fileId = await uploadFile(doc.content, doc.filename);
     await addFileToStore(storeId, fileId);
   }
+}
 
-  // 6. Summary
-  console.log('\n✅ Sync complete!\n');
-  console.log(`   Vector store ID: ${storeId}`);
-  console.log(`   Documents synced: ${docs.length}`);
+// ── Main ────────────────────────────────────────────────────────────
+
+async function main() {
+  console.log('\n🔄 HR-BPM Confluence Sync (Dual Store)');
+  console.log('=======================================\n');
+
+  // 1. Fetch pages
+  console.log(`1. Fetching pages from Confluence space ${SPACE_KEY}...`);
+  const pages = await fetchAllPages();
+  console.log(`   Found ${pages.length} pages.\n`);
+
+  // 2. Check page restrictions (explicit + inherited)
+  console.log('2. Checking page restrictions...');
+  const accessMap = await buildAccessMap(pages);
+
+  const generalCount = [...accessMap.values()].filter((v) => v === 'general').length;
+  const restrictedCount = [...accessMap.values()].filter((v) => v === 'restricted').length;
+  console.log(`   Summary: ${generalCount} general, ${restrictedCount} restricted\n`);
+
+  // 3. Prepare documents
+  console.log('3. Fetching page bodies and preparing documents...');
+  const allDocs = await prepareDocuments(pages, accessMap);
+  const generalDocs = allDocs.filter((d) => d.accessLevel === 'general');
+  console.log(`   Prepared ${allDocs.length} total (${generalDocs.length} general, ${allDocs.length - generalDocs.length} restricted)\n`);
+
+  // 4. Set up vector stores
+  const dateStr = new Date().toISOString().slice(0, 10);
+  console.log('4. Setting up OpenAI vector stores...');
+  const generalStoreId = await getOrCreateStore(
+    STORE_ID_GENERAL,
+    `HR-BPM General — ${dateStr}`,
+  );
+  const managerStoreId = await getOrCreateStore(
+    STORE_ID_MANAGER,
+    `HR-BPM Manager (All) — ${dateStr}`,
+  );
+
+  // 5. Clear existing files if updating
+  if (STORE_ID_GENERAL) {
+    console.log('\n5a. Clearing general store...');
+    await clearVectorStore(generalStoreId);
+  }
+  if (STORE_ID_MANAGER) {
+    console.log('5b. Clearing manager store...');
+    await clearVectorStore(managerStoreId);
+  }
+
+  // 6. Upload documents
+  console.log('\n6. Uploading documents...');
+  await uploadDocsToStore(generalStoreId, generalDocs, 'GENERAL');
+  await uploadDocsToStore(managerStoreId, allDocs, 'MANAGER');
+
+  // 7. Summary
+  console.log('\n\n✅ Sync complete!\n');
+  console.log(`   General store: ${generalStoreId} (${generalDocs.length} docs)`);
+  console.log(`   Manager store: ${managerStoreId} (${allDocs.length} docs)`);
   console.log(`   Space: ${SPACE_KEY}`);
-  console.log(`\n   Save this vector store ID for future syncs:`);
-  console.log(`   export VECTOR_STORE_ID="${storeId}"\n`);
+  console.log(`\n   Save these for future syncs and assistant setup:`);
+  console.log(`   export VECTOR_STORE_ID_GENERAL="${generalStoreId}"`);
+  console.log(`   export VECTOR_STORE_ID_MANAGER="${managerStoreId}"\n`);
 
-  // Print manifest
-  console.log('   Documents:');
-  for (const doc of docs) {
+  console.log('   General documents:');
+  for (const doc of generalDocs) {
+    console.log(`     ${doc.lastUpdated}  ${doc.title}`);
+  }
+  console.log(`\n   Restricted documents (manager-only):`);
+  for (const doc of allDocs.filter((d) => d.accessLevel === 'restricted')) {
     console.log(`     ${doc.lastUpdated}  ${doc.title}`);
   }
   console.log('');

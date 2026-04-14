@@ -2,8 +2,9 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import type { Message } from './types/chat';
 import type { SavedChat } from './types/chat';
-import { sendMessage, buildHistory, getApiKey, validateConnection } from './api';
+import { sendMessage, buildHistory, getApiKey, validateConnection, getRole } from './api';
 import type { ConnectionStatus } from './api';
+import type { UserRole } from './assistants';
 import { getChats, getChat, saveChat, deleteChat, createChat, titleFromMessages } from './store';
 import { getTheme, getThemeId } from './themes';
 import Sidebar from './components/Sidebar';
@@ -38,6 +39,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeId, setThemeId] = useState(getThemeId);
+  const [role, setCurrentRole] = useState<UserRole>(getRole);
   const [connection, setConnection] = useState<ConnectionStatus>({
     connected: false,
     model: null,
@@ -192,6 +194,9 @@ export default function App() {
             <span className="status-pill-dot" />
             HRBP Agent: {connection.connected ? 'connected' : 'disconnected'}
           </button>
+          <span className={`role-badge ${role === 'manager' ? 'role-badge--manager' : ''}`}>
+            {role === 'manager' ? 'Manager' : 'IC'}
+          </span>
           {activeChat?.route && <span className="route-badge">{activeChat.route}</span>}
           <div style={{ flex: 1 }} />
           <button
@@ -292,6 +297,7 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onStatusChange={setConnection}
         onThemeChange={setThemeId}
+        onRoleChange={setCurrentRole}
       />
     </div>
   );

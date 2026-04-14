@@ -10,7 +10,8 @@
  */
 
 import { CLASSIFIER_PROMPT } from './prompts/classifier';
-import { ASSISTANT_IDS } from './assistants';
+import { getAssistantId } from './assistants';
+import type { UserRole } from './assistants';
 
 const OPENAI_BASE = 'https://api.openai.com/v1';
 const MODEL = 'gpt-4o';
@@ -26,6 +27,7 @@ const ROUTE_LABELS: Record<string, string> = {
 // ── API key management ──────────────────────────────────────────────
 
 const STORAGE_KEY = 'hr-bpm-openai-key';
+const THREAD_STORAGE_KEY = 'hr-bpm-threads';
 
 export function getApiKey(): string | null {
   const key = localStorage.getItem(STORAGE_KEY);
@@ -38,6 +40,20 @@ export function setApiKey(key: string) {
 
 export function clearApiKey() {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+// ── Role management ─────────────────────────────────────────────────
+
+const ROLE_STORAGE_KEY = 'hr-bpm-role';
+
+export function getRole(): UserRole {
+  return (localStorage.getItem(ROLE_STORAGE_KEY) as UserRole) ?? 'general';
+}
+
+export function setRole(role: UserRole) {
+  localStorage.setItem(ROLE_STORAGE_KEY, role);
+  // Clear thread cache since threads are tied to specific assistants
+  localStorage.removeItem(THREAD_STORAGE_KEY);
 }
 
 // ── Connection validation ───────────────────────────────────────────
@@ -165,7 +181,7 @@ async function addMessage(threadId: string, content: string, role: 'user' | 'ass
 async function createRun(threadId: string, assistantId: string): Promise<string> {
   const data = await openAiJson(`/threads/${threadId}/runs`, {
     method: 'POST',
-    body: JSON.stringify({ assistant_id: assistantId }),
+    body: JSON.stringify({ assistant_id: assistantId, temperature: 0.2 }),
   }) as { id: string };
   return data.id;
 }
@@ -207,8 +223,6 @@ async function getLastAssistantMessage(threadId: string): Promise<string> {
 
 // ── Thread management (per chat) ────────────────────────────────────
 
-const THREAD_STORAGE_KEY = 'hr-bpm-threads';
-
 function getThreadMap(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(THREAD_STORAGE_KEY) ?? '{}');
@@ -238,8 +252,8 @@ export async function sendMessage(
   const classification = await classify(userMessage, history);
   const route = classification.route;
   const topic = ROUTE_LABELS[route] ?? 'General HR guidance';
-  const assistantId = ASSISTANT_IDS[route as keyof typeof ASSISTANT_IDS]
-    ?? ASSISTANT_IDS.policy;
+  const role = getRole();
+  const assistantId = getAssistantId(route, role);
 
   // Step 2: Get or create a thread for this chat
   let threadId: string | null = chatId ? getThreadId(chatId) : null;

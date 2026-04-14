@@ -996,6 +996,61 @@ body {
   margin: 4px 0;
 }
 
+/* ---- Role toggle ---- */
+
+.role-toggle {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid var(--border-2);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.role-option {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.role-option:first-child {
+  border-right: 1px solid var(--border-2);
+}
+
+.role-option--active {
+  background: var(--accent-m);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.role-option:hover:not(.role-option--active) {
+  background: var(--bg-2);
+}
+
+/* ---- Role badge (header) ---- */
+
+.role-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(152, 147, 173, 0.1);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.role-badge--manager {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--amber);
+}
+
 /* ---- Theme grid ---- */
 
 .theme-grid {
