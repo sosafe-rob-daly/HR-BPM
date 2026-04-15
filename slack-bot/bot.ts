@@ -295,6 +295,10 @@ interface ThreadInfo {
 }
 const threadMap = new Map<string, ThreadInfo>();
 
+// Active guided sessions per user (userId → ThreadInfo)
+// When a user invokes /career or /give-feedback, their DM messages route here
+const activeSessions = new Map<string, ThreadInfo>();
+
 async function createThread(): Promise<string> {
   const data = await oaiJson('/threads', { method: 'POST', body: '{}' }) as { id: string };
   return data.id;
@@ -380,7 +384,9 @@ async function handleGuidedFlow(
     const emoji = ROUTE_EMOJI[command] ?? ':brain:';
 
     const threadId = await createThread();
-    threadMap.set(messageTs, { threadId, route: command });
+    const session = { threadId, route: command };
+    threadMap.set(messageTs, session);
+    activeSessions.set(userId, session);
 
     const primer = buildPrimerMessage(command, role, extraContext);
     await addMessage(threadId, primer);
@@ -457,16 +463,24 @@ app.message(async ({ message, say, client }) => {
   if (commandMatch) {
     const command = commandMatch[1].toLowerCase().replace('give-', '');
     const extraContext = commandMatch[2]?.trim() || null;
-    console.log(`[guided] /${command} session${extraContext ? ` (context: ${extraContext})` : ''}`);
+    console.log(`[guided] ${command} session via DM${extraContext ? ` (context: ${extraContext})` : ''}`);
     await handleGuidedFlow(command, extraContext, channel, message.ts as string, userId, say, client);
     return;
   }
 
-  // Check if this thread has a stored route (follow-up in a guided session)
+  // Check if this thread has a stored route (follow-up in a threaded guided session)
   const threadInfo = threadMap.get(threadTs);
   if (threadInfo?.route) {
-    console.log(`[guided] Follow-up in ${threadInfo.route} session`);
+    console.log(`[guided] Follow-up in ${threadInfo.route} session (thread)`);
     await handleDirectMessage(text, threadInfo, channel, threadTs, userId, say, client);
+    return;
+  }
+
+  // Check if user has an active guided session (top-level DM replies)
+  const activeSession = activeSessions.get(userId);
+  if (activeSession?.route) {
+    console.log(`[guided] Follow-up in ${activeSession.route} session (active)`);
+    await handleDirectMessage(text, activeSession, channel, threadTs, userId, say, client);
     return;
   }
 
@@ -594,7 +608,9 @@ async function handleSlashCommand(
     const emoji = ROUTE_EMOJI[command] ?? ':brain:';
 
     const threadId = await createThread();
-    threadMap.set(progressTs, { threadId, route: command });
+    const session = { threadId, route: command };
+    threadMap.set(progressTs, session);
+    activeSessions.set(userId, session);
 
     const primer = buildPrimerMessage(command, role, extraContext);
     await addMessage(threadId, primer);
