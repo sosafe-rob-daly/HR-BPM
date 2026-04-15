@@ -295,9 +295,6 @@ interface ThreadInfo {
 }
 const threadMap = new Map<string, ThreadInfo>();
 
-// Active guided sessions per user (userId → ThreadInfo)
-// When a user invokes /career or /give-feedback, their DM messages route here
-const activeSessions = new Map<string, ThreadInfo>();
 
 async function createThread(): Promise<string> {
   const data = await oaiJson('/threads', { method: 'POST', body: '{}' }) as { id: string };
@@ -371,6 +368,9 @@ async function handleGuidedFlow(
   say: Function,
   client: bolt.WebClient,
 ) {
+  const emoji = ROUTE_EMOJI[command] ?? ':brain:';
+
+  // The user's message (messageTs) becomes the thread parent
   const progress = await say({ text: `:hourglass_flowing_sand: Setting up your ${command} session...`, thread_ts: messageTs });
   const progressTs = (progress as { ts: string }).ts;
 
@@ -381,12 +381,9 @@ async function handleGuidedFlow(
   try {
     const role = await getUserRole(client, userId);
     const assistantId = getAssistantId(command, role);
-    const emoji = ROUTE_EMOJI[command] ?? ':brain:';
 
     const threadId = await createThread();
-    const session = { threadId, route: command };
-    threadMap.set(messageTs, session);
-    activeSessions.set(userId, session);
+    threadMap.set(messageTs, { threadId, route: command });
 
     const primer = buildPrimerMessage(command, role, extraContext);
     await addMessage(threadId, primer);
@@ -476,13 +473,6 @@ app.message(async ({ message, say, client }) => {
     return;
   }
 
-  // Check if user has an active guided session (top-level DM replies)
-  const activeSession = activeSessions.get(userId);
-  if (activeSession?.route) {
-    console.log(`[guided] Follow-up in ${activeSession.route} session (active)`);
-    await handleDirectMessage(text, activeSession, channel, threadTs, userId, say, client);
-    return;
-  }
 
   const progress = await say({ text: ':hourglass_flowing_sand: Classifying your question...', thread_ts: threadTs });
   const progressTs = (progress as { ts: string }).ts;
@@ -591,10 +581,20 @@ async function handleSlashCommand(
     });
   }
 
-  // Post progress message in the DM
+  // Post top-level message in the DM
+  const emoji = ROUTE_EMOJI[command] ?? ':brain:';
+  const label = ROUTE_LABELS[command] ?? command;
+  const topLevel = await client.chat.postMessage({
+    channel: dmChannel,
+    text: `${emoji} *${label}* session started`,
+  });
+  const parentTs = topLevel.ts as string;
+
+  // Reply in the thread with a progress message
   const progress = await client.chat.postMessage({
     channel: dmChannel,
     text: `:hourglass_flowing_sand: Setting up your ${command} session...`,
+    thread_ts: parentTs,
   });
   const progressTs = progress.ts as string;
 
@@ -605,12 +605,9 @@ async function handleSlashCommand(
   try {
     const role = await getUserRole(client, userId);
     const assistantId = getAssistantId(command, role);
-    const emoji = ROUTE_EMOJI[command] ?? ':brain:';
 
     const threadId = await createThread();
-    const session = { threadId, route: command };
-    threadMap.set(progressTs, session);
-    activeSessions.set(userId, session);
+    threadMap.set(parentTs, { threadId, route: command });
 
     const primer = buildPrimerMessage(command, role, extraContext);
     await addMessage(threadId, primer);
