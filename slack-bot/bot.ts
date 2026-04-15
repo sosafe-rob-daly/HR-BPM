@@ -453,9 +453,9 @@ app.message(async ({ message, say, client }) => {
   const threadTs = ('thread_ts' in message ? message.thread_ts : message.ts) as string;
 
   // Detect career or feedback commands (DMs only)
-  const commandMatch = text.match(/^(career|feedback)(?:\s+(.*))?$/i);
+  const commandMatch = text.match(/^(career|(?:give-)?feedback)(?:\s+(.*))?$/i);
   if (commandMatch) {
-    const command = commandMatch[1].toLowerCase();
+    const command = commandMatch[1].toLowerCase().replace('give-', '');
     const extraContext = commandMatch[2]?.trim() || null;
     console.log(`[guided] /${command} session${extraContext ? ` (context: ${extraContext})` : ''}`);
     await handleGuidedFlow(command, extraContext, channel, message.ts as string, userId, say, client);
@@ -617,10 +617,10 @@ app.command('/career', async ({ command, ack, respond, client }) => {
   await handleSlashCommand('career', extraContext, command.user_id, command.channel_id, client, respond);
 });
 
-app.command('/feedback', async ({ command, ack, respond, client }) => {
+app.command('/give-feedback', async ({ command, ack, respond, client }) => {
   await ack();
   const extraContext = command.text?.trim() || null;
-  console.log(`[slash] /feedback from ${command.user_id}${extraContext ? ` (context: ${extraContext})` : ''}`);
+  console.log(`[slash] /give-feedback from ${command.user_id}${extraContext ? ` (context: ${extraContext})` : ''}`);
   await handleSlashCommand('feedback', extraContext, command.user_id, command.channel_id, client, respond);
 });
 
