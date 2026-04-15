@@ -555,6 +555,75 @@ app.event('app_mention', async ({ event, say, client }) => {
   }
 });
 
+// ── Slash commands: /career and /feedback ───────────────────────────
+
+async function handleSlashCommand(
+  command: string,
+  extraContext: string | null,
+  userId: string,
+  channelId: string,
+  client: bolt.WebClient,
+  respond: Function,
+) {
+  // Open a DM with the user
+  const dm = await client.conversations.open({ users: userId });
+  const dmChannel = (dm.channel as { id: string }).id;
+
+  // If invoked from a channel (not already a DM), send ephemeral acknowledgment
+  if (channelId !== dmChannel) {
+    await respond({
+      text: `:compass: I've started a ${command} session in your DMs.`,
+      response_type: 'ephemeral',
+    });
+  }
+
+  // Post progress message in the DM
+  const progress = await client.chat.postMessage({
+    channel: dmChannel,
+    text: `:hourglass_flowing_sand: Setting up your ${command} session...`,
+  });
+  const progressTs = progress.ts as string;
+
+  const updateProgress = async (text: string) => {
+    await client.chat.update({ channel: dmChannel, ts: progressTs, text });
+  };
+
+  try {
+    const role = await getUserRole(client, userId);
+    const assistantId = getAssistantId(command, role);
+    const emoji = ROUTE_EMOJI[command] ?? ':brain:';
+
+    const threadId = await createThread();
+    threadMap.set(progressTs, { threadId, route: command });
+
+    const primer = buildPrimerMessage(command, role, extraContext);
+    await addMessage(threadId, primer);
+    const runId = await createRun(threadId, assistantId);
+    await waitForRun(threadId, runId);
+    const response = await getLastMessage(threadId);
+
+    await updateProgress(`${emoji} ${response}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Something went wrong';
+    console.error(`Error handling /${command}:`, msg);
+    await updateProgress(`:warning: Sorry, I ran into an issue: ${msg}`);
+  }
+}
+
+app.command('/career', async ({ command, ack, respond, client }) => {
+  await ack();
+  const extraContext = command.text?.trim() || null;
+  console.log(`[slash] /career from ${command.user_id}${extraContext ? ` (context: ${extraContext})` : ''}`);
+  await handleSlashCommand('career', extraContext, command.user_id, command.channel_id, client, respond);
+});
+
+app.command('/feedback', async ({ command, ack, respond, client }) => {
+  await ack();
+  const extraContext = command.text?.trim() || null;
+  console.log(`[slash] /feedback from ${command.user_id}${extraContext ? ` (context: ${extraContext})` : ''}`);
+  await handleSlashCommand('feedback', extraContext, command.user_id, command.channel_id, client, respond);
+});
+
 // ── Start ───────────────────────────────────────────────────────────
 
 (async () => {
