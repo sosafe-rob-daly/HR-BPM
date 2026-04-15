@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import type { Message } from './types/chat';
 import type { SavedChat } from './types/chat';
-import { sendMessage, buildHistory, getApiKey, validateConnection, getRole } from './api';
+import { sendMessage, sendSlashCommand, sendDirectMessage, cancelCurrentRun, buildHistory, getApiKey, validateConnection, getRole } from './api';
+import { SLASH_COMMANDS } from './commands';
 import type { ConnectionStatus } from './api';
 import type { UserRole } from './assistants';
 import { getChats, getChat, saveChat, deleteChat, createChat, titleFromMessages } from './store';
@@ -49,7 +50,9 @@ export default function App() {
 
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
   const hasMessages = activeChat && activeChat.messages.length > 0;
-  const showSidebar = chats.length > 0 || hasMessages;
+  const isSlashLoading = activeChat?.slashCommand && responding && !hasMessages;
+  const showChatView = hasMessages || isSlashLoading;
+  const showSidebar = chats.length > 0 || showChatView;
 
   // Sync hash → state on back/forward navigation
   useEffect(() => {
@@ -103,6 +106,60 @@ export default function App() {
     refreshChats();
   }, [activeChatId, refreshChats]);
 
+  const handleCancel = useCallback(async () => {
+    await cancelCurrentRun();
+    setResponding(false);
+  }, []);
+
+  const handleSlashCommand = useCallback(
+    async (commandId: string) => {
+      if (!getApiKey()) {
+        setSettingsOpen(true);
+        return;
+      }
+
+      setError(null);
+
+      const cmdDef = SLASH_COMMANDS.find((c) => c.id === commandId);
+      const chat = createChat();
+      chat.slashCommand = commandId;
+      chat.route = commandId;
+      chat.title = cmdDef?.label ?? commandId;
+      setActiveChatId(chat.id);
+
+      saveChat(chat);
+      refreshChats();
+      setResponding(true);
+
+      try {
+        const result = await sendSlashCommand(commandId, chat.id);
+
+        const agentMsg: Message = {
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          content: result.content,
+          timestamp: new Date(),
+        };
+
+        chat.messages = [agentMsg];
+        chat.topic = result.topic;
+        chat.updatedAt = Date.now();
+        saveChat(chat);
+        refreshChats();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Something went wrong';
+        setError(msg);
+        if (msg.includes('API key') || msg.includes('401')) {
+          setConnection({ connected: false, model: null, error: 'Invalid API key' });
+          setSettingsOpen(true);
+        }
+      } finally {
+        setResponding(false);
+      }
+    },
+    [refreshChats],
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
       if (!getApiKey()) {
@@ -135,8 +192,15 @@ export default function App() {
       setResponding(true);
 
       try {
-        const history = buildHistory(chat.messages.slice(0, -1)); // exclude the message we just added
-        const result = await sendMessage(text, history, chat.id);
+        let result;
+        if (chat.slashCommand) {
+          // Slash command chat — skip classifier, route directly
+          result = await sendDirectMessage(text, chat.slashCommand, chat.id);
+        } else {
+          // Normal flow — classify then route
+          const history = buildHistory(chat.messages.slice(0, -1));
+          result = await sendMessage(text, history, chat.id);
+        }
 
         const agentMsg: Message = {
           id: `agent-${Date.now()}`,
@@ -212,10 +276,10 @@ export default function App() {
           </button>
         </div>
 
-        {hasMessages ? (
+        {showChatView ? (
           <div className="chat-card">
             <div className="message-thread" ref={threadRef}>
-              {activeChat.messages.map((msg) => (
+              {(activeChat?.messages ?? []).map((msg) => (
                 <div key={msg.id} className={`message message--${msg.role}`}>
                   <div className="message-bubble">
                   {msg.role === 'agent' ? (
@@ -278,11 +342,11 @@ export default function App() {
               </div>
             )}
 
-            <ChatInput onSend={handleSend} disabled={responding} />
+            <ChatInput onSend={handleSend} onSlashCommand={handleSlashCommand} onCancel={handleCancel} disabled={responding} />
           </div>
         ) : (
           <>
-            <Welcome onSend={handleSend} disabled={responding} />
+            <Welcome onSend={handleSend} onSlashCommand={handleSlashCommand} disabled={responding} />
             {error && (
               <div className="chat-error">
                 {error}

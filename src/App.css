@@ -713,6 +713,7 @@ body {
 /* ---- Input area ---- */
 
 .chat-input-area {
+  position: relative;
   padding: 16px 28px 24px;
   flex-shrink: 0;
 }
@@ -784,6 +785,193 @@ body {
   cursor: default;
   transform: none;
   box-shadow: none;
+}
+
+.chat-stop-btn {
+  background: var(--text-2, #64748b);
+  color: white;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.chat-stop-btn:hover {
+  background: var(--text-1, #475569);
+  transform: scale(1.08);
+}
+
+/* ---- Input action buttons (+ and /) ---- */
+
+.input-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.input-action-btn:hover:not(:disabled) {
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+
+.upload-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.command-btn--active {
+  color: var(--accent);
+  background: var(--accent-soft, rgba(108, 92, 231, 0.1));
+}
+
+/* ---- Command palette ---- */
+
+.command-palette {
+  position: absolute;
+  bottom: 100%;
+  left: 28px;
+  right: 28px;
+  margin-bottom: 8px;
+  background: var(--bg-0);
+  border: 1.5px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.12));
+  overflow: hidden;
+  z-index: 10;
+  animation: paletteIn 0.15s ease-out;
+}
+
+@keyframes paletteIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.command-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+  font-family: var(--font);
+}
+
+.command-palette-item:hover,
+.command-palette-item--selected {
+  background: var(--bg-2, rgba(108, 92, 231, 0.06));
+}
+
+.command-palette-item + .command-palette-item {
+  border-top: 1px solid var(--border-1);
+}
+
+.command-palette-slash {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent);
+  min-width: 72px;
+}
+
+.command-palette-label {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-0);
+}
+
+.command-palette-desc {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-left: auto;
+}
+
+/* ---- Welcome command cards ---- */
+
+.welcome-commands {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.welcome-command-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: var(--font);
+}
+
+.welcome-command-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.12);
+  transform: translateY(-2px);
+}
+
+.welcome-command-card:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+[data-theme="dark"] .welcome-command-card {
+  background: rgba(30, 27, 46, 0.5);
+}
+
+.welcome-command-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-soft, rgba(108, 92, 231, 0.1));
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.welcome-command-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.welcome-command-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-0);
+}
+
+.welcome-command-desc {
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .welcome-commands {
+    flex-direction: column;
+  }
+  .command-palette-desc {
+    display: none;
+  }
 }
 
 /* ---- Scrollbar styling ---- */

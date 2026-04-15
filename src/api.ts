@@ -22,6 +22,8 @@ const ROUTE_LABELS: Record<string, string> = {
   conversation: 'Difficult conversations',
   policy: 'Policy & process',
   separation: 'Separation & termination',
+  career: 'Career development',
+  feedback: 'Feedback preparation',
 };
 
 // ── API key management ──────────────────────────────────────────────
@@ -135,7 +137,7 @@ const classifierSchema = {
       properties: {
         route: {
           type: 'string',
-          enum: ['escalation', 'separation', 'performance', 'conversation', 'policy'],
+          enum: ['escalation', 'separation', 'performance', 'conversation', 'policy', 'career', 'feedback'],
         },
         confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
         reasoning: { type: 'string' },
@@ -178,11 +180,15 @@ async function addMessage(threadId: string, content: string, role: 'user' | 'ass
   });
 }
 
+// Track active run so it can be cancelled
+let activeRun: { threadId: string; runId: string } | null = null;
+
 async function createRun(threadId: string, assistantId: string): Promise<string> {
   const data = await openAiJson(`/threads/${threadId}/runs`, {
     method: 'POST',
     body: JSON.stringify({ assistant_id: assistantId, temperature: 0.2 }),
   }) as { id: string };
+  activeRun = { threadId, runId: data.id };
   return data.id;
 }
 
@@ -194,7 +200,7 @@ async function waitForRun(threadId: string, runId: string): Promise<void> {
       last_error?: { message: string };
     };
 
-    if (data.status === 'completed') return;
+    if (data.status === 'completed') { activeRun = null; return; }
     if (data.status === 'failed') {
       throw new Error(data.last_error?.message ?? 'Assistant run failed');
     }
@@ -205,6 +211,19 @@ async function waitForRun(threadId: string, runId: string): Promise<void> {
     await new Promise((r) => setTimeout(r, 1000));
   }
   throw new Error('Assistant run timed out');
+}
+
+export async function cancelCurrentRun(): Promise<boolean> {
+  if (!activeRun) return false;
+  const { threadId, runId } = activeRun;
+  try {
+    await openAiJson(`/threads/${threadId}/runs/${runId}/cancel`, { method: 'POST' });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    activeRun = null;
+  }
 }
 
 async function getLastAssistantMessage(threadId: string): Promise<string> {
@@ -277,6 +296,65 @@ export async function sendMessage(
   const content = await getLastAssistantMessage(threadId);
 
   return { content, route, topic, confidence: classification.confidence };
+}
+
+// ── Slash command: initiate a guided session ───────────────────────
+
+function buildPrimerMessage(command: string, role: UserRole): string {
+  const roleLabel = role === 'manager' ? 'a people manager' : 'an individual contributor';
+  if (command === 'career') {
+    return `The user has initiated a /career session. They are ${roleLabel}. Begin by greeting them warmly and asking what career challenge or growth aspiration they are currently working on. Be exploratory and encouraging.`;
+  }
+  if (command === 'feedback') {
+    return `The user has initiated a /feedback session. They are ${roleLabel}. Begin by greeting them and asking: Who is the feedback for, and what is the context (review cycle, ad-hoc, peer feedback)? Your goal is to help them write effective feedback.`;
+  }
+  return `The user has initiated a /${command} session. They are ${roleLabel}. Begin by greeting them and understanding their situation.`;
+}
+
+export async function sendSlashCommand(
+  command: string,
+  chatId: string,
+): Promise<AgentResponse> {
+  const role = getRole();
+  const assistantId = getAssistantId(command, role);
+  const topic = ROUTE_LABELS[command] ?? 'Guided session';
+
+  // Create a new thread (slash commands always start fresh)
+  const threadId = await createThread();
+  saveThreadId(chatId, threadId);
+
+  // Send a priming message (visible to assistant, not shown in UI)
+  const primer = buildPrimerMessage(command, role);
+  await addMessage(threadId, primer);
+
+  // Run the assistant to generate the opening question
+  const runId = await createRun(threadId, assistantId);
+  await waitForRun(threadId, runId);
+  const content = await getLastAssistantMessage(threadId);
+
+  return { content, route: command, topic, confidence: 'high' };
+}
+
+// ── Slash command: send a follow-up message (skips classifier) ─────
+
+export async function sendDirectMessage(
+  userMessage: string,
+  route: string,
+  chatId: string,
+): Promise<AgentResponse> {
+  const role = getRole();
+  const assistantId = getAssistantId(route, role);
+  const topic = ROUTE_LABELS[route] ?? 'Guided session';
+
+  const threadId = getThreadId(chatId);
+  if (!threadId) throw new Error('No thread found for this chat');
+
+  await addMessage(threadId, userMessage);
+  const runId = await createRun(threadId, assistantId);
+  await waitForRun(threadId, runId);
+  const content = await getLastAssistantMessage(threadId);
+
+  return { content, route, topic, confidence: 'high' };
 }
 
 // ── Build conversation history from our message format ──────────────

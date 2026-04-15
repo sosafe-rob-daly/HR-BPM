@@ -13,6 +13,8 @@ import { PERFORMANCE_PROMPT } from '../src/prompts/performance';
 import { CONVERSATION_PROMPT } from '../src/prompts/conversation';
 import { POLICY_PROMPT } from '../src/prompts/policy';
 import { SEPARATION_PROMPT } from '../src/prompts/separation';
+import { CAREER_PROMPT } from '../src/prompts/career';
+import { FEEDBACK_PROMPT } from '../src/prompts/feedback';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) { console.error('Missing OPENAI_API_KEY'); process.exit(1); }
@@ -22,6 +24,8 @@ const domainPrompts: Record<string, string> = {
   conversation: CONVERSATION_PROMPT,
   policy: POLICY_PROMPT,
   separation: SEPARATION_PROMPT,
+  career: CAREER_PROMPT,
+  feedback: FEEDBACK_PROMPT,
 };
 
 async function updateAssistant(id: string, instructions: string, label: string) {

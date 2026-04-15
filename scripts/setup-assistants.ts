@@ -26,6 +26,8 @@ import { PERFORMANCE_PROMPT } from '../src/prompts/performance';
 import { CONVERSATION_PROMPT } from '../src/prompts/conversation';
 import { POLICY_PROMPT } from '../src/prompts/policy';
 import { SEPARATION_PROMPT } from '../src/prompts/separation';
+import { CAREER_PROMPT } from '../src/prompts/career';
+import { FEEDBACK_PROMPT } from '../src/prompts/feedback';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VS_GENERAL = process.env.VECTOR_STORE_ID_GENERAL;
@@ -47,7 +49,7 @@ const classifierSchema = {
       properties: {
         route: {
           type: 'string',
-          enum: ['escalation', 'separation', 'performance', 'conversation', 'policy'],
+          enum: ['escalation', 'separation', 'performance', 'conversation', 'policy', 'career', 'feedback'],
         },
         confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
         reasoning: { type: 'string' },
@@ -63,6 +65,8 @@ const domainAgents = [
   { key: 'conversation', name: 'Conversation', instructions: CONVERSATION_PROMPT },
   { key: 'policy', name: 'Policy', instructions: POLICY_PROMPT },
   { key: 'separation', name: 'Separation', instructions: SEPARATION_PROMPT },
+  { key: 'career', name: 'Career', instructions: CAREER_PROMPT },
+  { key: 'feedback', name: 'Feedback', instructions: FEEDBACK_PROMPT },
 ];
 
 async function createAssistant(

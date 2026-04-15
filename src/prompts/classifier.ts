@@ -51,6 +51,26 @@ Route here when the message is about:
 - HR tools and systems (Personio, Confluence references)
 - Working hours, remote work, relocation policies
 
+6. CAREER DEVELOPMENT → "career"
+Route here when the message is about:
+- Career growth, progression, or getting to the next level
+- Individual Development Plans (IDPs) or development goals
+- Career framework questions (IC levels, management track, craft frameworks)
+- Promotion criteria or pathways
+- Skill development or training for career advancement
+- Levelling conversations or career conversations with direct reports
+
+7. FEEDBACK PREPARATION → "feedback"
+Route here when the message is about:
+- Writing or structuring feedback for a review cycle
+- Peer feedback, 360 feedback, or upward feedback
+- How to write effective feedback
+- Preparing feedback for a specific person
+- Core behaviours or competency-based assessment
+- "Help me write feedback for someone"
+
+Note: If the message is about *delivering* feedback in a conversation (not writing it), route to "conversation" instead.
+
 Ambiguous or multi-intent messages:
 - If a message spans two non-escalation categories, route to the one that represents the primary ask
 - If truly ambiguous, route to "policy" as the safest default

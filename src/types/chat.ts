@@ -23,7 +23,15 @@ export interface SavedChat {
   messages: Message[];
   topic: string | null;
   route: string | null;
+  slashCommand: string | null;
   updatedAt: number;
+}
+
+export interface SlashCommandDef {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
 }
 
 export interface Conversation {

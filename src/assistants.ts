@@ -16,23 +16,27 @@
 export type UserRole = 'general' | 'manager';
 
 export const ASSISTANT_IDS = {
-  classifier: 'asst_Z80QDpR7vBfPD3AybfMTtmMI',
-  escalation: 'asst_ILlD4D0iWja22rEpFx1Z1cHV',
+  classifier: 'asst_KqvOTkovieN165q3Ra8GWJlO',
+  escalation: 'asst_Bl9VhFXAdHuDLpX3MzIAnPcm',
   general: {
-    performance: 'asst_rv5KDbupjOttcqsJqDSZRorg',
-    conversation: 'asst_Wznw66uGX2shOz5JhulLcqjV',
-    policy: 'asst_EezRSJ435MMhpvJWKL8i8rCd',
-    separation: 'asst_g74hv9Gq5aECXp2SCAVWsdx1',
+    performance: 'asst_sYavgrSqakmyEGckijGjamGF',
+    conversation: 'asst_3Si8pMROlcLyUXb6NMXDedUy',
+    policy: 'asst_izc7w5azGUSECuXnjUkPxkJz',
+    separation: 'asst_Hn7bZqqLIx92AzKfqQYEocfD',
+    career: 'asst_Mp0OGqAeDDBBnfz9o1khX5iU',
+    feedback: 'asst_XW71vhUrcWcDVEYVUtOvAU3o',
   },
   manager: {
-    performance: 'asst_DLZKrLJYfdESX27RtY5FkbbG',
-    conversation: 'asst_Pa81conwymSnxuaMjVxTLJRW',
-    policy: 'asst_gylPFYTBBaAARzbp3anuC2Zw',
-    separation: 'asst_tKTquBvJ8afrtW1XXU2lajBV',
+    performance: 'asst_uizjgpZmRWzNa8puKBEdWiTj',
+    conversation: 'asst_hTMnaDNZoZIFNmzRXC3O0Hef',
+    policy: 'asst_G0n7dZw7C2vIaLdMThV13kxt',
+    separation: 'asst_HPrL4sfQ2AydUAusRFUzQc7e',
+    career: 'asst_EPxBrnPZW5eKygrboQAajJzl',
+    feedback: 'asst_4Ljtzkd7VkF9Yge3h5G6oFOM',
   },
 };
 
-type DomainRoute = 'performance' | 'conversation' | 'policy' | 'separation';
+type DomainRoute = 'performance' | 'conversation' | 'policy' | 'separation' | 'career' | 'feedback';
 
 export function getAssistantId(route: string, role: UserRole): string {
   if (route === 'escalation') return ASSISTANT_IDS.escalation;

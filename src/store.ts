@@ -50,6 +50,7 @@ export function createChat(): SavedChat {
     messages: [],
     topic: null,
     route: null,
+    slashCommand: null,
     updatedAt: Date.now(),
   };
 }
