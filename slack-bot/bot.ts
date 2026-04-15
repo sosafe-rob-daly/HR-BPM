@@ -35,17 +35,21 @@ const ASSISTANT_IDS = {
     conversation: 'asst_Wznw66uGX2shOz5JhulLcqjV',
     policy: 'asst_EezRSJ435MMhpvJWKL8i8rCd',
     separation: 'asst_g74hv9Gq5aECXp2SCAVWsdx1',
+    career: 'asst_Mp0OGqAeDDBBnfz9o1khX5iU',
+    feedback: 'asst_XW71vhUrcWcDVEYVUtOvAU3o',
   },
   manager: {
     performance: 'asst_DLZKrLJYfdESX27RtY5FkbbG',
     conversation: 'asst_Pa81conwymSnxuaMjVxTLJRW',
     policy: 'asst_gylPFYTBBaAARzbp3anuC2Zw',
     separation: 'asst_tKTquBvJ8afrtW1XXU2lajBV',
+    career: 'asst_EPxBrnPZW5eKygrboQAajJzl',
+    feedback: 'asst_4Ljtzkd7VkF9Yge3h5G6oFOM',
   },
 };
 
 type UserRole = 'general' | 'manager';
-type DomainRoute = 'performance' | 'conversation' | 'policy' | 'separation';
+type DomainRoute = 'performance' | 'conversation' | 'policy' | 'separation' | 'career' | 'feedback';
 
 function getAssistantId(route: string, role: UserRole): string {
   if (route === 'escalation') return ASSISTANT_IDS.escalation;
@@ -59,6 +63,8 @@ const ROUTE_EMOJI: Record<string, string> = {
   conversation: ':speech_balloon:',
   policy: ':book:',
   separation: ':handshake:',
+  career: ':compass:',
+  feedback: ':pencil:',
 };
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -67,6 +73,8 @@ const ROUTE_LABELS: Record<string, string> = {
   conversation: 'Difficult conversations',
   policy: 'Policy & process',
   separation: 'Separation & termination',
+  career: 'Career development',
+  feedback: 'Feedback preparation',
 };
 
 // ── Manager group membership ────────────────────────────────────────
@@ -226,7 +234,7 @@ const classifierSchema = {
     schema: {
       type: 'object',
       properties: {
-        route: { type: 'string', enum: ['escalation', 'separation', 'performance', 'conversation', 'policy'] },
+        route: { type: 'string', enum: ['escalation', 'separation', 'performance', 'conversation', 'policy', 'career', 'feedback'] },
         confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
         reasoning: { type: 'string' },
       },
@@ -281,7 +289,11 @@ async function classify(text: string): Promise<ClassifierResult> {
 
 // ── Assistants API ──────────────────────────────────────────────────
 
-const threadMap = new Map<string, string>();
+interface ThreadInfo {
+  threadId: string;
+  route?: string;  // set for guided sessions, undefined for classified chats
+}
+const threadMap = new Map<string, ThreadInfo>();
 
 async function createThread(): Promise<string> {
   const data = await oaiJson('/threads', { method: 'POST', body: '{}' }) as { id: string };
@@ -328,6 +340,96 @@ async function getLastMessage(threadId: string): Promise<string> {
   return raw.replace(/【\d+:\d+†[^】]*】/g, '');
 }
 
+// ── Guided flow helpers ─────────────────────────────────────────────
+
+function buildPrimerMessage(command: string, role: UserRole, extraContext: string | null): string {
+  const roleLabel = role === 'manager' ? 'a people manager' : 'an individual contributor';
+  let primer: string;
+  if (command === 'career') {
+    primer = `The user has initiated a /career session. They are ${roleLabel}. Begin by greeting them warmly and asking what career challenge or growth aspiration they are currently working on. Be exploratory and encouraging.`;
+  } else if (command === 'feedback') {
+    primer = `The user has initiated a /feedback session. They are ${roleLabel}. Begin by greeting them and asking: Who is the feedback for, and what is the context (review cycle, ad-hoc, peer feedback)? Your goal is to help them write effective feedback.`;
+  } else {
+    primer = `The user has initiated a /${command} session. They are ${roleLabel}. Begin by greeting them and understanding their situation.`;
+  }
+  if (extraContext) {
+    primer += ` The user also provided this context: '${extraContext}'. Use this to skip any questions that are already answered and get straight to helping.`;
+  }
+  return primer;
+}
+
+async function handleGuidedFlow(
+  command: string,
+  extraContext: string | null,
+  channel: string,
+  messageTs: string,
+  userId: string,
+  say: Function,
+  client: bolt.WebClient,
+) {
+  const progress = await say({ text: `:hourglass_flowing_sand: Setting up your ${command} session...`, thread_ts: messageTs });
+  const progressTs = (progress as { ts: string }).ts;
+
+  const updateProgress = async (text: string) => {
+    await client.chat.update({ channel, ts: progressTs, text });
+  };
+
+  try {
+    const role = await getUserRole(client, userId);
+    const assistantId = getAssistantId(command, role);
+    const emoji = ROUTE_EMOJI[command] ?? ':brain:';
+
+    const threadId = await createThread();
+    threadMap.set(messageTs, { threadId, route: command });
+
+    const primer = buildPrimerMessage(command, role, extraContext);
+    await addMessage(threadId, primer);
+    const runId = await createRun(threadId, assistantId);
+    await waitForRun(threadId, runId);
+    const response = await getLastMessage(threadId);
+
+    await updateProgress(`${emoji} ${response}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Something went wrong';
+    console.error(`Error handling /${command}:`, msg);
+    await updateProgress(`:warning: Sorry, I ran into an issue: ${msg}`);
+  }
+}
+
+async function handleDirectMessage(
+  text: string,
+  threadInfo: ThreadInfo,
+  channel: string,
+  threadTs: string,
+  userId: string,
+  say: Function,
+  client: bolt.WebClient,
+) {
+  const progress = await say({ text: ':hourglass_flowing_sand: Thinking...', thread_ts: threadTs });
+  const progressTs = (progress as { ts: string }).ts;
+
+  const updateProgress = async (msg: string) => {
+    await client.chat.update({ channel, ts: progressTs, text: msg });
+  };
+
+  try {
+    const role = await getUserRole(client, userId);
+    const assistantId = getAssistantId(threadInfo.route!, role);
+    const emoji = ROUTE_EMOJI[threadInfo.route!] ?? ':brain:';
+
+    await addMessage(threadInfo.threadId, text);
+    const runId = await createRun(threadInfo.threadId, assistantId);
+    await waitForRun(threadInfo.threadId, runId);
+    const response = await getLastMessage(threadInfo.threadId);
+
+    await updateProgress(`${emoji} ${response}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Something went wrong';
+    console.error('Error handling direct message:', msg);
+    await updateProgress(`:warning: Sorry, I ran into an issue: ${msg}`);
+  }
+}
+
 // ── Slack app ───────────────────────────────────────────────────────
 
 const app = new App({
@@ -344,10 +446,29 @@ app.message(async ({ message, say, client }) => {
   if ('bot_id' in message) return;
 
   const userId = (message as { user: string }).user;
-  console.log(`[processing] ${message.text} (user: ${userId})`);
+  const text = message.text.trim();
+  console.log(`[processing] ${text} (user: ${userId})`);
 
   const channel = message.channel;
   const threadTs = ('thread_ts' in message ? message.thread_ts : message.ts) as string;
+
+  // Detect /career or /feedback commands (DMs only)
+  const commandMatch = text.match(/^\/(career|feedback)(?:\s+(.*))?$/i);
+  if (commandMatch) {
+    const command = commandMatch[1].toLowerCase();
+    const extraContext = commandMatch[2]?.trim() || null;
+    console.log(`[guided] /${command} session${extraContext ? ` (context: ${extraContext})` : ''}`);
+    await handleGuidedFlow(command, extraContext, channel, message.ts as string, userId, say, client);
+    return;
+  }
+
+  // Check if this thread has a stored route (follow-up in a guided session)
+  const threadInfo = threadMap.get(threadTs);
+  if (threadInfo?.route) {
+    console.log(`[guided] Follow-up in ${threadInfo.route} session`);
+    await handleDirectMessage(text, threadInfo, channel, threadTs, userId, say, client);
+    return;
+  }
 
   const progress = await say({ text: ':hourglass_flowing_sand: Classifying your question...', thread_ts: threadTs });
   const progressTs = (progress as { ts: string }).ts;
@@ -360,19 +481,20 @@ app.message(async ({ message, say, client }) => {
     // Determine user role
     const role = await getUserRole(client, userId);
 
-    const { route } = await classify(message.text);
+    const { route } = await classify(text);
     const emoji = ROUTE_EMOJI[route] ?? ':brain:';
     const roleLabel = role === 'manager' ? ' :star:' : '';
     await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route}${roleLabel} — generating response...`);
 
     const assistantId = getAssistantId(route, role);
-    let threadId = threadMap.get(threadTs);
+    const existing = threadMap.get(threadTs);
+    let threadId = existing?.threadId;
     if (!threadId) {
       threadId = await createThread();
-      threadMap.set(threadTs, threadId);
+      threadMap.set(threadTs, { threadId });
     }
 
-    await addMessage(threadId, message.text);
+    await addMessage(threadId, text);
     const runId = await createRun(threadId, assistantId);
     await waitForRun(threadId, runId);
     const response = await getLastMessage(threadId);
@@ -413,10 +535,11 @@ app.event('app_mention', async ({ event, say, client }) => {
     await updateProgress(`${emoji} Routed to ${ROUTE_LABELS[route] ?? route}${roleLabel} — generating response...`);
 
     const assistantId = getAssistantId(route, role);
-    let threadId = threadMap.get(threadTs);
+    const existing = threadMap.get(threadTs);
+    let threadId = existing?.threadId;
     if (!threadId) {
       threadId = await createThread();
-      threadMap.set(threadTs, threadId);
+      threadMap.set(threadTs, { threadId });
     }
 
     await addMessage(threadId, text);
