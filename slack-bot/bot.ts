@@ -338,7 +338,29 @@ async function getLastMessage(threadId: string): Promise<string> {
   if (!msg || msg.role !== 'assistant') throw new Error('No assistant response');
   const textBlock = msg.content.find((c) => c.type === 'text');
   const raw = textBlock?.text?.value ?? '';
-  return raw.replace(/【\d+:\d+†[^】]*】/g, '');
+  return markdownToSlack(raw.replace(/【\d+:\d+†[^】]*】/g, ''));
+}
+
+function markdownToSlack(text: string): string {
+  return text
+    // Remove citation markers
+    .replace(/【\d+:\d+†[^】]*】/g, '')
+    // Headers → bold text (### heading → *heading*)
+    .replace(/^#{1,6}\s+(.+)$/gm, '*$1*')
+    // Bold: **text** → *text* (but not inside URLs)
+    .replace(/\*\*(.+?)\*\*/g, '*$1*')
+    // Italic: _text_ stays the same in Slack
+    // Strikethrough: ~~text~~ → ~text~
+    .replace(/~~(.+?)~~/g, '~$1~')
+    // Inline code stays the same: `code`
+    // Code blocks: ```lang\n...\n``` → ```\n...\n```
+    .replace(/```\w*\n/g, '```\n')
+    // Links: [text](url) → <url|text>
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<$2|$1>')
+    // Horizontal rules → blank line
+    .replace(/^---+$/gm, '')
+    // Clean up excessive blank lines
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 // ── Guided flow helpers ─────────────────────────────────────────────
