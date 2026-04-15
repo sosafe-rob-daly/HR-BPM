@@ -346,11 +346,11 @@ function buildPrimerMessage(command: string, role: UserRole, extraContext: strin
   const roleLabel = role === 'manager' ? 'a people manager' : 'an individual contributor';
   let primer: string;
   if (command === 'career') {
-    primer = `The user has initiated a /career session. They are ${roleLabel}. Begin by greeting them warmly and asking what career challenge or growth aspiration they are currently working on. Be exploratory and encouraging.`;
+    primer = `The user has initiated a career session. They are ${roleLabel}. Begin by greeting them warmly and asking what career challenge or growth aspiration they are currently working on. Be exploratory and encouraging.`;
   } else if (command === 'feedback') {
-    primer = `The user has initiated a /feedback session. They are ${roleLabel}. Begin by greeting them and asking: Who is the feedback for, and what is the context (review cycle, ad-hoc, peer feedback)? Your goal is to help them write effective feedback.`;
+    primer = `The user has initiated a feedback session. They are ${roleLabel}. Begin by greeting them and asking: Who is the feedback for, and what is the context (review cycle, ad-hoc, peer feedback)? Your goal is to help them write effective feedback.`;
   } else {
-    primer = `The user has initiated a /${command} session. They are ${roleLabel}. Begin by greeting them and understanding their situation.`;
+    primer = `The user has initiated a ${command} session. They are ${roleLabel}. Begin by greeting them and understanding their situation.`;
   }
   if (extraContext) {
     primer += ` The user also provided this context: '${extraContext}'. Use this to skip any questions that are already answered and get straight to helping.`;
@@ -452,8 +452,8 @@ app.message(async ({ message, say, client }) => {
   const channel = message.channel;
   const threadTs = ('thread_ts' in message ? message.thread_ts : message.ts) as string;
 
-  // Detect /career or /feedback commands (DMs only)
-  const commandMatch = text.match(/^\/(career|feedback)(?:\s+(.*))?$/i);
+  // Detect career or feedback commands (DMs only)
+  const commandMatch = text.match(/^(career|feedback)(?:\s+(.*))?$/i);
   if (commandMatch) {
     const command = commandMatch[1].toLowerCase();
     const extraContext = commandMatch[2]?.trim() || null;
